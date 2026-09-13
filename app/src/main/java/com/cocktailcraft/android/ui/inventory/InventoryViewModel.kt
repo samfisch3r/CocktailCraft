@@ -31,7 +31,7 @@ class InventoryViewModel @Inject constructor(
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<InventoryUiState> = combine(
-        repository.getAllBottles(System.currentTimeMillis()),
+        repository.getAllBottles(),
         _searchQuery,
         _selectedImageUri,
         _selectedBottle
@@ -87,13 +87,6 @@ class InventoryViewModel @Inject constructor(
                 expiresAt = System.currentTimeMillis() + (7 * 24 * 60 * 60 * 1000L)
             )
             repository.updateBottle(updated)
-        }
-    }
-
-    fun deleteBottle(bottleId: Long) {
-        viewModelScope.launch {
-            repository.deleteBottle(bottleId)
-            repository.pruneUnusedIngredients()
         }
     }
 }

@@ -49,8 +49,8 @@ class CocktailRepositoryImpl @Inject constructor(
         cocktailDao.deleteUnusedIngredients()
     }
 
-    override fun getAllBottles(currentTime: Long): Flow<List<BottleItem>> {
-        return cocktailDao.getAllBottles(currentTime)
+    override fun getAllBottles(): Flow<List<BottleItem>> {
+        return cocktailDao.getAllBottles()
     }
 
     override suspend fun addBottle(bottle: BottleStockEntity): Long {
@@ -69,8 +69,8 @@ class CocktailRepositoryImpl @Inject constructor(
         cocktailDao.deleteBottle(bottleId)
     }
 
-    override suspend fun getBottlesForIngredient(ingredientId: Long, currentTime: Long): List<BottleStockEntity> {
-        return cocktailDao.getBottlesForIngredient(ingredientId, currentTime)
+    override suspend fun getBottlesForIngredient(ingredientId: Long): List<BottleStockEntity> {
+        return cocktailDao.getBottlesForIngredient(ingredientId)
     }
 
     override fun getRecipesMatchingBottle(bottleId: Long, currentTime: Long): Flow<List<RecipeWithMissingCount>> {
@@ -81,8 +81,8 @@ class CocktailRepositoryImpl @Inject constructor(
         return cocktailDao.getAvailableRecipesWithRating(currentTime)
     }
 
-    override fun getUnratedRecipes(limit: Int): Flow<List<RecipeWithRating>> {
-        return cocktailDao.getUnratedRecipesWithRating(limit)
+    override fun getUnratedRecipes(): Flow<List<RecipeWithRating>> {
+        return cocktailDao.getUnratedRecipesWithRating()
     }
 
     override fun getAllRecipesWithMissingCount(currentTime: Long): Flow<List<RecipeWithMissingCount>> {
@@ -119,5 +119,24 @@ class CocktailRepositoryImpl @Inject constructor(
 
     override suspend fun addVersion(version: RecipeVersionHistoryEntity) {
         cocktailDao.insertVersionHistory(version)
+    }
+
+    override suspend fun getFullBackup(): com.cocktailcraft.android.domain.model.BarBackup {
+        return com.cocktailcraft.android.domain.model.BarBackup(
+            ingredients = cocktailDao.getAllIngredientsSync(),
+            bottles = cocktailDao.getAllBottlesSync(),
+            recipes = cocktailDao.getAllRecipesSync(),
+            ingredientRefs = cocktailDao.getAllIngredientRefsSync(),
+            ratings = cocktailDao.getAllRatingsSync()
+        )
+    }
+
+    override suspend fun restoreBackup(backup: com.cocktailcraft.android.domain.model.BarBackup) {
+        cocktailDao.clearAllData()
+        cocktailDao.insertIngredients(backup.ingredients)
+        cocktailDao.insertBottles(backup.bottles)
+        cocktailDao.insertRecipes(backup.recipes)
+        cocktailDao.insertRecipeIngredients(backup.ingredientRefs)
+        cocktailDao.insertRatings(backup.ratings)
     }
 }

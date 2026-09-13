@@ -27,16 +27,15 @@ import com.cocktailcraft.android.domain.repository.RemoteRecipe
 @Composable
 fun AddEditRecipeScreen(
     viewModel: AddEditRecipeViewModel,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    var showAddIngredientDialog by remember { mutableStateOf(false) }
-    var showManageCatalogDialog by remember { mutableStateOf(false) }
+    var showAddIngredientDialog by remember { mutableStateOf(value = false) }
+    var showManageCatalogDialog by remember { mutableStateOf(value = false) }
     
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
-        onResult = { uri -> viewModel.onImageSelected(uri) }
-    )
+    ) { uri -> viewModel.onImageSelected(uri) }
 
     LaunchedEffect(uiState.isSaved) {
         if (uiState.isSaved) {
@@ -57,17 +56,17 @@ fun AddEditRecipeScreen(
                     IconButton(onClick = { showManageCatalogDialog = true }) {
                         Icon(Icons.Default.Settings, contentDescription = "Manage Catalog")
                     }
-                }
+                },
             )
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = { viewModel.saveRecipe() },
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text("Save Recipe") }
+                text = { Text("Save Recipe") },
             )
         },
-        containerColor = MaterialTheme.colorScheme.background
+        containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->
         if (!uiState.isInitialLoadDone) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -82,18 +81,18 @@ fun AddEditRecipeScreen(
                     .windowInsetsPadding(WindowInsets.ime)
                     .verticalScroll(rememberScrollState())
                     .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     OutlinedTextField(
                         value = uiState.name,
                         onValueChange = { viewModel.onNameChange(it) },
                         label = { Text("Recipe Name") },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
                     )
                     
                     if (uiState.isFetching) {
@@ -103,37 +102,37 @@ fun AddEditRecipeScreen(
                             Icon(
                                 imageVector = Icons.Default.AutoFixHigh,
                                 contentDescription = "Fetch Classic Specs",
-                                tint = MaterialTheme.colorScheme.primary
+                                tint = MaterialTheme.colorScheme.primary,
                             )
                         }
                     }
                 }
 
-                if (uiState.imageUri != null) {
+                uiState.imageUri?.let {
                     AsyncImage(
-                        model = uiState.imageUri,
+                        model = it,
                         contentDescription = null,
                         modifier = Modifier.fillMaxWidth().height(200.dp),
-                        contentScale = ContentScale.Crop
+                        contentScale = ContentScale.Crop,
                     )
                 }
                 Button(
                     onClick = {
                         photoPickerLauncher.launch(
-                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                         )
                     },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
                     Icon(Icons.Default.PhotoCamera, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text(if (uiState.imageUri != null) "Change Photo" else "Add Photo")
                 }
 
-                var glassExpanded by remember { mutableStateOf(false) }
+                var glassExpanded by remember { mutableStateOf(value = false) }
                 ExposedDropdownMenuBox(
                     expanded = glassExpanded,
-                    onExpandedChange = { glassExpanded = !glassExpanded }
+                    onExpandedChange = { glassExpanded = !glassExpanded },
                 ) {
                     OutlinedTextField(
                         value = uiState.glassType,
@@ -141,11 +140,11 @@ fun AddEditRecipeScreen(
                         readOnly = true,
                         label = { Text("Glass Type") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = glassExpanded) },
-                        modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable).fillMaxWidth()
+                        modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable).fillMaxWidth(),
                     )
                     ExposedDropdownMenu(
                         expanded = glassExpanded,
-                        onDismissRequest = { glassExpanded = false }
+                        onDismissRequest = { glassExpanded = false },
                     ) {
                         GlassType.entries.forEach { glass ->
                             DropdownMenuItem(
@@ -153,7 +152,7 @@ fun AddEditRecipeScreen(
                                 onClick = {
                                     viewModel.onGlassTypeChange(glass.displayName)
                                     glassExpanded = false
-                                }
+                                },
                             )
                         }
                     }
@@ -162,7 +161,7 @@ fun AddEditRecipeScreen(
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text("Ingredients", style = MaterialTheme.typography.titleMedium)
                     TextButton(onClick = { showAddIngredientDialog = true }) {
@@ -177,8 +176,7 @@ fun AddEditRecipeScreen(
                         availableIngredients = uiState.availableIngredients,
                         inventory = uiState.inventory,
                         onUpdate = { update -> viewModel.updateIngredient(index, update) },
-                        onRemove = { viewModel.removeIngredient(index) }
-                    )
+                    ) { viewModel.removeIngredient(index) }
                 }
 
                 TextButton(onClick = { viewModel.addIngredient() }) {
@@ -191,7 +189,7 @@ fun AddEditRecipeScreen(
                     onValueChange = { viewModel.onInstructionsChange(it) },
                     label = { Text("Instructions") },
                     modifier = Modifier.fillMaxWidth(),
-                    minLines = 3
+                    minLines = 3,
                 )
                 
                 Spacer(Modifier.height(80.dp)) // Extra space for FAB
@@ -202,11 +200,10 @@ fun AddEditRecipeScreen(
     if (showAddIngredientDialog) {
         NewIngredientDialog(
             onDismiss = { showAddIngredientDialog = false },
-            onSave = { name ->
-                viewModel.onAddNewIngredient(name)
-                showAddIngredientDialog = false
-            }
-        )
+        ) { name ->
+            viewModel.onAddNewIngredient(name)
+            showAddIngredientDialog = false
+        }
     }
 
     if (showManageCatalogDialog) {
@@ -215,7 +212,7 @@ fun AddEditRecipeScreen(
             usages = uiState.ingredientUsages,
             onDismiss = { showManageCatalogDialog = false },
             onDelete = { viewModel.deleteCatalogIngredient(it) },
-            onRename = { ingredient, newName -> viewModel.renameIngredient(ingredient, newName) }
+            onRename = { ingredient, newName -> viewModel.renameIngredient(ingredient, newName) },
         )
     }
 
@@ -223,8 +220,7 @@ fun AddEditRecipeScreen(
         SearchResultDialog(
             results = uiState.searchResults,
             onSelected = { viewModel.onSearchResultSelected(it) },
-            onDismiss = { viewModel.onSearchDialogDismiss() }
-        )
+        ) { viewModel.onSearchDialogDismiss() }
     }
 }
 
@@ -234,7 +230,7 @@ fun ManageCatalogDialog(
     usages: Map<Long, Int>,
     onDismiss: () -> Unit,
     onDelete: (IngredientEntity) -> Unit,
-    onRename: (IngredientEntity, String) -> Unit
+    onRename: (IngredientEntity, String) -> Unit,
 ) {
     var editingIngredient by remember { mutableStateOf<IngredientEntity?>(null) }
     var editName by remember { mutableStateOf("") }
@@ -246,14 +242,14 @@ fun ManageCatalogDialog(
             Column {
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(ingredients) { ingredient ->
                         val usageCount = usages[ingredient.id] ?: 0
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            horizontalArrangement = Arrangement.SpaceBetween,
                         ) {
                             if (editingIngredient?.id == ingredient.id) {
                                 OutlinedTextField(
@@ -267,7 +263,7 @@ fun ManageCatalogDialog(
                                         }) {
                                             Icon(Icons.Default.Check, contentDescription = "Save")
                                         }
-                                    }
+                                    },
                                 )
                             } else {
                                 Column(modifier = Modifier.weight(1f)) {
@@ -275,24 +271,26 @@ fun ManageCatalogDialog(
                                     Text(
                                         text = if (usageCount > 0) "Used in $usageCount items" else "Unused",
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = if (usageCount > 0) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outline
+                                        color = if (usageCount > 0) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outline,
                                     )
                                 }
                                 Row {
-                                    IconButton(onClick = { 
-                                        editingIngredient = ingredient
-                                        editName = ingredient.name
-                                    }) {
+                                    IconButton(
+                                        onClick = { 
+                                            editingIngredient = ingredient
+                                            editName = ingredient.name
+                                        }
+                                    ) {
                                         Icon(Icons.Default.Edit, contentDescription = "Rename")
                                     }
                                     IconButton(
                                         onClick = { onDelete(ingredient) },
-                                        enabled = usageCount == 0
+                                        enabled = usageCount == 0,
                                     ) {
                                         Icon(
                                             Icons.Default.Delete, 
                                             contentDescription = "Delete", 
-                                            tint = if (usageCount == 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline
+                                            tint = if (usageCount == 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline,
                                         )
                                     }
                                 }
@@ -305,7 +303,7 @@ fun ManageCatalogDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) { Text("Done") }
-        }
+        },
     )
 }
 
@@ -313,7 +311,7 @@ fun ManageCatalogDialog(
 fun SearchResultDialog(
     results: List<RemoteRecipe>,
     onSelected: (RemoteRecipe) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -321,7 +319,7 @@ fun SearchResultDialog(
         text = {
             LazyColumn(
                 modifier = Modifier.fillMaxWidth().heightIn(max = 600.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(results) { recipe ->
                     Row(
@@ -330,14 +328,14 @@ fun SearchResultDialog(
                             .clickable { onSelected(recipe) }
                             .padding(8.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
-                        if (recipe.imageUri != null) {
+                        recipe.imageUri?.let {
                             AsyncImage(
-                                model = recipe.imageUri,
+                                model = it,
                                 contentDescription = null,
                                 modifier = Modifier.size(48.dp),
-                                contentScale = ContentScale.Crop
+                                contentScale = ContentScale.Crop,
                             )
                         }
                         Text(text = recipe.name, style = MaterialTheme.typography.bodyLarge)
@@ -350,14 +348,14 @@ fun SearchResultDialog(
             TextButton(onClick = onDismiss) {
                 Text("Cancel")
             }
-        }
+        },
     )
 }
 
 @Composable
 fun NewIngredientDialog(
     onDismiss: () -> Unit,
-    onSave: (String) -> Unit
+    onSave: (String) -> Unit,
 ) {
     var name by remember { mutableStateOf("") }
 
@@ -369,7 +367,7 @@ fun NewIngredientDialog(
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Ingredient Name (e.g. Lime Juice)") }
+                    label = { Text("Ingredient Name (e.g. Lime Juice)") },
                 )
             }
         },
@@ -382,7 +380,7 @@ fun NewIngredientDialog(
             TextButton(onClick = onDismiss) {
                 Text("Cancel")
             }
-        }
+        },
     )
 }
 
@@ -393,7 +391,7 @@ fun IngredientRow(
     availableIngredients: List<IngredientEntity>,
     inventory: List<BottleItem>,
     onUpdate: ((IngredientInputState) -> IngredientInputState) -> Unit,
-    onRemove: () -> Unit
+    onRemove: () -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -436,7 +434,7 @@ fun IngredientRow(
                     }
                 }
                 
-                if (ingredient.preferredBrand == null && (ingredient.ingredient != null || ingredient.pendingName != null)) {
+                if (ingredient.preferredBrand == null && ((ingredient.ingredient != null) || (ingredient.pendingName != null))) {
                     IconButton(onClick = { onUpdate { it.copy(preferredBrand = "") } }) {
                         Icon(Icons.Default.Add, contentDescription = "Specify Brand")
                     }
@@ -447,7 +445,7 @@ fun IngredientRow(
                 }
             }
 
-            if ((ingredient.ingredient != null || ingredient.pendingName != null) && ingredient.preferredBrand != null) {
+            if (((ingredient.ingredient != null) || (ingredient.pendingName != null)) && (ingredient.preferredBrand != null)) {
                 val ingredientName = ingredient.ingredient?.name ?: ingredient.pendingName ?: ""
                 val matchingBottles = inventory.filter { it.ingredientName.equals(ingredientName, ignoreCase = true) }
                 var brandExpanded by remember { mutableStateOf(false) }
@@ -501,7 +499,7 @@ fun IngredientRow(
             ) {
                 OutlinedTextField(
                     value = if (ingredient.unit == IngredientUnit.TOP_UP) "" else ingredient.amount,
-                    onValueChange = { val value = it; onUpdate { it.copy(amount = value) } },
+                    onValueChange = { value -> onUpdate { it.copy(amount = value) } },
                     label = { Text("Amount") },
                     enabled = ingredient.unit != IngredientUnit.TOP_UP,
                     modifier = Modifier.weight(1f),

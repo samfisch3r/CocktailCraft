@@ -21,7 +21,6 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.cocktailcraft.android.data.local.entity.*
-import com.cocktailcraft.android.R
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -31,7 +30,7 @@ fun RecipeDetailScreen(
     viewModel: RecipeDetailViewModel,
     onEditClick: (Long) -> Unit,
     onDeleteSuccess: () -> Unit,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -44,9 +43,9 @@ fun RecipeDetailScreen(
 
     val recipe = uiState.recipe ?: return
 
-    var showRatingDialog by remember { mutableStateOf(false) }
-    var showDeleteConfirmation by remember { mutableStateOf(false) }
-    var showGlassInfo by remember { mutableStateOf(false) }
+    var showRatingDialog by remember { mutableStateOf(value = false) }
+    var showDeleteConfirmation by remember { mutableStateOf(value = false) }
+    var showGlassInfo by remember { mutableStateOf(value = false) }
 
     Scaffold(
         topBar = {
@@ -105,8 +104,7 @@ fun RecipeDetailScreen(
                         uiState.ingredients.forEach { ingredient ->
                             IngredientItem(
                                 ingredient = ingredient,
-                                onClick = { viewModel.loadMatchingBottles(ingredient.ingredientId, ingredient.ingredientName) }
-                            )
+                            ) { viewModel.loadMatchingBottles(ingredient.ingredientId, ingredient.ingredientName) }
                         }
                     }
                 }
@@ -122,7 +120,7 @@ fun RecipeDetailScreen(
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(text = "Ratings", style = MaterialTheme.typography.titleMedium)
                     Button(onClick = { showRatingDialog = true }) {
@@ -133,9 +131,8 @@ fun RecipeDetailScreen(
 
             item {
                 RatingsSection(
-                    versions = uiState.versions,
-                    onVersionClick = { viewModel.selectVersion(it) }
-                )
+                    ratings = uiState.ratings,
+                ) { viewModel.selectRating(it) }
             }
         }
     }
@@ -144,15 +141,14 @@ fun RecipeDetailScreen(
         val glass = GlassType.fromString(recipe.glassType)
         GlassInfoDialog(
             glassType = glass,
-            onDismiss = { showGlassInfo = false }
-        )
+        ) { showGlassInfo = false }
     }
 
     if (showRatingDialog) {
         AddRatingDialog(
             onDismiss = { showRatingDialog = false },
             onSave = { rating, notes ->
-                viewModel.addTweak(rating, notes)
+                viewModel.addRating(rating, notes)
                 showRatingDialog = false
             }
         )
@@ -182,16 +178,16 @@ fun RecipeDetailScreen(
         )
     }
 
-    uiState.selectedVersion?.let { version ->
+    uiState.selectedRating?.let { rating ->
         RatingSnapshotDialog(
-            version = version,
-            ingredients = uiState.selectedVersionIngredients,
-            onDismiss = { viewModel.selectVersion(null) },
-            onRestore = { viewModel.restoreVersion(version) }
+            rating = rating,
+            ingredients = uiState.selectedRatingIngredients,
+            onDismiss = { viewModel.selectRating(null) },
+            onRestore = { viewModel.restoreRating(rating) }
         )
     }
 
-    if (uiState.matchingBottles.isNotEmpty() || uiState.selectedIngredientName != null) {
+    if (uiState.matchingBottles.isNotEmpty() || (uiState.selectedIngredientName != null)) {
         MatchingBottlesDialog(
             ingredientName = uiState.selectedIngredientName ?: "",
             bottles = uiState.matchingBottles,
@@ -203,7 +199,7 @@ fun RecipeDetailScreen(
 @Composable
 fun GlassInfoDialog(
     glassType: GlassType,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -236,7 +232,7 @@ fun GlassInfoDialog(
 @Composable
 fun IngredientItem(
     ingredient: RecipeIngredient,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -292,7 +288,7 @@ fun IngredientItem(
 fun MatchingBottlesDialog(
     ingredientName: String,
     bottles: List<BottleStockEntity>,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -325,26 +321,26 @@ fun MatchingBottlesDialog(
 
 @Composable
 fun RatingsSection(
-    versions: List<RecipeVersionHistoryEntity>,
-    onVersionClick: (RecipeVersionHistoryEntity) -> Unit
+    ratings: List<RecipeVersionHistoryEntity>,
+    onRatingClick: (RecipeVersionHistoryEntity) -> Unit,
 ) {
     LazyRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        items(versions) { version ->
-            RatingCard(version, onClick = { onVersionClick(version) })
+        items(ratings) { rating ->
+            RatingCard(rating, onClick = { onRatingClick(rating) })
         }
     }
 }
 
 @Composable
 fun RatingCard(
-    version: RecipeVersionHistoryEntity,
-    onClick: () -> Unit
+    rating: RecipeVersionHistoryEntity,
+    onClick: () -> Unit,
 ) {
-    val date = remember(version.timestamp) {
-        SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(Date(version.timestamp))
+    val date = remember(rating.timestamp) {
+        SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(Date(rating.timestamp))
     }
     Card(
         modifier = Modifier
@@ -354,14 +350,14 @@ fun RatingCard(
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                Text(text = "v${version.versionNumber}", fontWeight = FontWeight.Bold)
+                Text(text = "#${rating.versionNumber}", fontWeight = FontWeight.Bold)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Star, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Text(text = version.rating.toString())
+                    Text(text = rating.rating.toString())
                 }
             }
             Text(text = date, style = MaterialTheme.typography.labelSmall)
-            version.tweakNotes?.let {
+            rating.tweakNotes?.let {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(text = it, style = MaterialTheme.typography.bodySmall, maxLines = 2)
             }
@@ -371,14 +367,14 @@ fun RatingCard(
 
 @Composable
 fun RatingSnapshotDialog(
-    version: RecipeVersionHistoryEntity,
+    rating: RecipeVersionHistoryEntity,
     ingredients: List<IngredientSnapshot>,
     onDismiss: () -> Unit,
-    onRestore: () -> Unit
+    onRestore: () -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Version ${version.versionNumber} Snapshot") },
+        title = { Text("Rating #${rating.versionNumber} Details") },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth().heightIn(max = 500.dp),
@@ -396,11 +392,11 @@ fun RatingSnapshotDialog(
                 }
                 HorizontalDivider()
                 Text(text = "Instructions", style = MaterialTheme.typography.titleSmall)
-                Text(text = version.instructions, style = MaterialTheme.typography.bodySmall)
-                if (!version.tweakNotes.isNullOrBlank()) {
+                Text(text = rating.instructions, style = MaterialTheme.typography.bodySmall)
+                if (!rating.tweakNotes.isNullOrBlank()) {
                     HorizontalDivider()
                     Text(text = "Notes", style = MaterialTheme.typography.titleSmall)
-                    Text(text = version.tweakNotes, style = MaterialTheme.typography.bodySmall)
+                    Text(text = rating.tweakNotes, style = MaterialTheme.typography.bodySmall)
                 }
             }
         },
@@ -420,9 +416,9 @@ fun RatingSnapshotDialog(
 @Composable
 fun AddRatingDialog(
     onDismiss: () -> Unit,
-    onSave: (Float, String) -> Unit
+    onSave: (Float, String) -> Unit,
 ) {
-    var rating by remember { mutableStateOf(4f) }
+    var rating by remember { mutableFloatStateOf(4f) }
     var notes by remember { mutableStateOf("") }
 
     AlertDialog(

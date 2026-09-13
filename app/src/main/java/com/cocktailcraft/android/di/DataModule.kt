@@ -20,6 +20,7 @@ import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
+@Suppress("unused")
 object DataModule {
 
     @Provides
@@ -30,7 +31,6 @@ object DataModule {
             CocktailDatabase::class.java,
             "cocktail_craft.db"
         )
-            .fallbackToDestructiveMigration(dropAllTables = true)
             .build()
     }
 

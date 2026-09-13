@@ -67,20 +67,20 @@ interface CocktailDao {
             i.name as ingredientName, 
             b.notes,
             b.expiresAt,
-            b.imageUri
+            b.imageUri,
+            b.inStock
         FROM bottle_stock b
         JOIN ingredient i ON b.ingredientId = i.id
-        WHERE b.expiresAt IS NULL OR b.expiresAt > :currentTime
         ORDER BY i.name ASC, b.name ASC
     """)
-    fun getAllBottles(currentTime: Long): Flow<List<BottleItem>>
+    fun getAllBottles(): Flow<List<BottleItem>>
 
     @Query("""
         SELECT b.* FROM bottle_stock b
         JOIN ingredient i ON b.ingredientId = i.id
-        WHERE i.id = :ingredientId AND (b.expiresAt IS NULL OR b.expiresAt > :currentTime)
+        WHERE i.id = :ingredientId
     """)
-    suspend fun getBottlesForIngredient(ingredientId: Long, currentTime: Long): List<BottleStockEntity>
+    suspend fun getBottlesForIngredient(ingredientId: Long): List<BottleStockEntity>
 
     // --- Recipes ---
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -95,9 +95,6 @@ interface CocktailDao {
     @Query("DELETE FROM recipe_ingredient_xref WHERE recipeId = :recipeId")
     suspend fun deleteIngredientsForRecipe(recipeId: Long)
 
-    @Query("SELECT * FROM recipe_ingredient_xref WHERE recipeId = :recipeId")
-    suspend fun getIngredientsForRecipe(recipeId: Long): List<RecipeIngredientCrossRefEntity>
-
     @Query("""
         SELECT 
             i.id as ingredientId, 
@@ -109,13 +106,13 @@ interface CocktailDao {
             b_assigned.name as assignedBottleName,
             CASE 
                 WHEN xref.assignedBottleId IS NOT NULL THEN 
-                    (SELECT COUNT(*) FROM bottle_stock WHERE id = xref.assignedBottleId AND (expiresAt IS NULL OR expiresAt > :currentTime)) > 0
+                    (SELECT COUNT(*) FROM bottle_stock WHERE id = xref.assignedBottleId AND inStock = 1 AND (expiresAt IS NULL OR expiresAt > :currentTime)) > 0
                 WHEN xref.preferredBrand IS NOT NULL THEN 
-                    (SELECT COUNT(*) FROM bottle_stock WHERE ingredientId = i.id AND LOWER(name) = LOWER(xref.preferredBrand) AND (expiresAt IS NULL OR expiresAt > :currentTime)) > 0
+                    (SELECT COUNT(*) FROM bottle_stock WHERE ingredientId = i.id AND LOWER(name) = LOWER(xref.preferredBrand) AND inStock = 1 AND (expiresAt IS NULL OR expiresAt > :currentTime)) > 0
                 ELSE 
-                    (SELECT COUNT(*) FROM bottle_stock WHERE ingredientId = i.id AND (expiresAt IS NULL OR expiresAt > :currentTime)) > 0
+                    (SELECT COUNT(*) FROM bottle_stock WHERE ingredientId = i.id AND inStock = 1 AND (expiresAt IS NULL OR expiresAt > :currentTime)) > 0
             END as isAvailable,
-            (SELECT GROUP_CONCAT(name, ', ') FROM bottle_stock WHERE ingredientId = i.id AND (expiresAt IS NULL OR expiresAt > :currentTime)) as bottleNames
+            (SELECT GROUP_CONCAT(name, ', ') FROM bottle_stock WHERE ingredientId = i.id AND inStock = 1 AND (expiresAt IS NULL OR expiresAt > :currentTime)) as bottleNames
         FROM recipe_ingredient_xref AS xref
         JOIN ingredient AS i ON xref.ingredientId = i.id
         LEFT JOIN bottle_stock AS b_assigned ON xref.assignedBottleId = b_assigned.id
@@ -137,17 +134,17 @@ interface CocktailDao {
                 AND (
                     (assignedBottleId IS NULL AND preferredBrand IS NULL AND xref.ingredientId NOT IN (
                         SELECT ingredientId FROM bottle_stock 
-                        WHERE expiresAt IS NULL OR expiresAt > :currentTime
+                        WHERE inStock = 1 AND (expiresAt IS NULL OR expiresAt > :currentTime)
                     ))
                     OR
                     (assignedBottleId IS NOT NULL AND assignedBottleId NOT IN (
                         SELECT id FROM bottle_stock 
-                        WHERE expiresAt IS NULL OR expiresAt > :currentTime
+                        WHERE inStock = 1 AND (expiresAt IS NULL OR expiresAt > :currentTime)
                     ))
                     OR
                     (preferredBrand IS NOT NULL AND assignedBottleId IS NULL AND xref.ingredientId NOT IN (
                         SELECT ingredientId FROM bottle_stock 
-                        WHERE LOWER(name) = LOWER(xref.preferredBrand) AND (expiresAt IS NULL OR expiresAt > :currentTime)
+                        WHERE LOWER(name) = LOWER(xref.preferredBrand) AND inStock = 1 AND (expiresAt IS NULL OR expiresAt > :currentTime)
                     ))
                 )
             ) as missingCount,
@@ -155,7 +152,7 @@ interface CocktailDao {
         FROM cocktail_recipe r
         JOIN recipe_ingredient_xref xref ON r.id = xref.recipeId
         JOIN bottle_stock b ON xref.ingredientId = b.ingredientId
-        WHERE b.id = :bottleId AND (b.expiresAt IS NULL OR b.expiresAt > :currentTime)
+        WHERE b.id = :bottleId AND b.inStock = 1 AND (b.expiresAt IS NULL OR b.expiresAt > :currentTime)
         ORDER BY missingCount ASC, name ASC
     """)
     fun getRecipesMatchingBottleWithMissingCount(bottleId: Long, currentTime: Long): Flow<List<RecipeWithMissingCount>>
@@ -169,11 +166,11 @@ interface CocktailDao {
             SELECT recipeId FROM recipe_ingredient_xref xref
             JOIN ingredient i ON xref.ingredientId = i.id
             WHERE 
-                (assignedBottleId IS NULL AND preferredBrand IS NULL AND xref.ingredientId NOT IN (SELECT ingredientId FROM bottle_stock WHERE expiresAt IS NULL OR expiresAt > :currentTime))
+                (assignedBottleId IS NULL AND preferredBrand IS NULL AND xref.ingredientId NOT IN (SELECT ingredientId FROM bottle_stock WHERE inStock = 1 AND (expiresAt IS NULL OR expiresAt > :currentTime)))
                 OR
-                (assignedBottleId IS NOT NULL AND assignedBottleId NOT IN (SELECT id FROM bottle_stock WHERE expiresAt IS NULL OR expiresAt > :currentTime))
+                (assignedBottleId IS NOT NULL AND assignedBottleId NOT IN (SELECT id FROM bottle_stock WHERE inStock = 1 AND (expiresAt IS NULL OR expiresAt > :currentTime)))
                 OR
-                (preferredBrand IS NOT NULL AND assignedBottleId IS NULL AND xref.ingredientId NOT IN (SELECT ingredientId FROM bottle_stock WHERE LOWER(name) = LOWER(xref.preferredBrand) AND (expiresAt IS NULL OR expiresAt > :currentTime)))
+                (preferredBrand IS NOT NULL AND assignedBottleId IS NULL AND xref.ingredientId NOT IN (SELECT ingredientId FROM bottle_stock WHERE LOWER(name) = LOWER(xref.preferredBrand) AND inStock = 1 AND (expiresAt IS NULL OR expiresAt > :currentTime)))
         )
     """)
     fun getAvailableRecipesWithRating(currentTime: Long): Flow<List<RecipeWithRating>>
@@ -185,9 +182,8 @@ interface CocktailDao {
         FROM cocktail_recipe r
         WHERE id NOT IN (SELECT DISTINCT recipeId FROM recipe_version_history)
         ORDER BY id DESC
-        LIMIT :limit
     """)
-    fun getUnratedRecipesWithRating(limit: Int): Flow<List<RecipeWithRating>>
+    fun getUnratedRecipesWithRating(): Flow<List<RecipeWithRating>>
 
     @Query("""
         SELECT 
@@ -199,17 +195,17 @@ interface CocktailDao {
                 AND (
                     (assignedBottleId IS NULL AND preferredBrand IS NULL AND xref.ingredientId NOT IN (
                         SELECT ingredientId FROM bottle_stock 
-                        WHERE expiresAt IS NULL OR expiresAt > :currentTime
+                        WHERE inStock = 1 AND (expiresAt IS NULL OR expiresAt > :currentTime)
                     ))
                     OR
                     (assignedBottleId IS NOT NULL AND assignedBottleId NOT IN (
                         SELECT id FROM bottle_stock 
-                        WHERE expiresAt IS NULL OR expiresAt > :currentTime
+                        WHERE inStock = 1 AND (expiresAt IS NULL OR expiresAt > :currentTime)
                     ))
                     OR
                     (preferredBrand IS NOT NULL AND assignedBottleId IS NULL AND xref.ingredientId NOT IN (
                         SELECT ingredientId FROM bottle_stock 
-                        WHERE LOWER(name) = LOWER(xref.preferredBrand) AND (expiresAt IS NULL OR expiresAt > :currentTime)
+                        WHERE LOWER(name) = LOWER(xref.preferredBrand) AND inStock = 1 AND (expiresAt IS NULL OR expiresAt > :currentTime)
                     ))
                 )
             ) as missingCount,
@@ -218,6 +214,60 @@ interface CocktailDao {
         ORDER BY missingCount ASC, name ASC
     """)
     fun getAllRecipesWithMissingCount(currentTime: Long): Flow<List<RecipeWithMissingCount>>
+
+    @Query("SELECT * FROM cocktail_recipe")
+    suspend fun getAllRecipesSync(): List<CocktailRecipeEntity>
+
+    @Query("SELECT * FROM recipe_ingredient_xref")
+    suspend fun getAllIngredientRefsSync(): List<RecipeIngredientCrossRefEntity>
+
+    @Query("SELECT * FROM recipe_version_history")
+    suspend fun getAllRatingsSync(): List<RecipeVersionHistoryEntity>
+
+    @Query("SELECT * FROM bottle_stock")
+    suspend fun getAllBottlesSync(): List<BottleStockEntity>
+
+    @Query("SELECT * FROM ingredient")
+    suspend fun getAllIngredientsSync(): List<IngredientEntity>
+
+    @Transaction
+    suspend fun clearAllData() {
+        deleteAllBottles()
+        deleteAllRecipeIngredients()
+        deleteAllRecipes()
+        deleteAllIngredients()
+        deleteAllRatings()
+    }
+
+    @Query("DELETE FROM bottle_stock")
+    suspend fun deleteAllBottles()
+
+    @Query("DELETE FROM recipe_ingredient_xref")
+    suspend fun deleteAllRecipeIngredients()
+
+    @Query("DELETE FROM cocktail_recipe")
+    suspend fun deleteAllRecipes()
+
+    @Query("DELETE FROM ingredient")
+    suspend fun deleteAllIngredients()
+
+    @Query("DELETE FROM recipe_version_history")
+    suspend fun deleteAllRatings()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertIngredients(ingredients: List<IngredientEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertBottles(bottles: List<BottleStockEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertRecipes(recipes: List<CocktailRecipeEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertRecipeIngredients(refs: List<RecipeIngredientCrossRefEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertRatings(ratings: List<RecipeVersionHistoryEntity>)
 
     // --- Version History ---
     @Insert(onConflict = OnConflictStrategy.REPLACE)

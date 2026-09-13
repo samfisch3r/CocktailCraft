@@ -1,36 +1,87 @@
 package com.cocktailcraft.android.ui.dashboard
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.cocktailcraft.android.data.local.entity.CocktailRecipeEntity
+import java.io.InputStream
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
     viewModel: DashboardViewModel,
-    onRecipeClick: (Long) -> Unit
+    onRecipeClick: (Long) -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    var showSettings by remember { mutableStateOf(value = false) }
+
+    val createDocumentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri ->
+        uri?.let {
+            viewModel.createBackup { json ->
+                context.contentResolver.openOutputStream(it)?.use { output ->
+                    output.write(json.toByteArray())
+                }
+            }
+        }
+    }
+
+    val openDocumentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        uri?.let {
+            val inputStream: InputStream? = context.contentResolver.openInputStream(it)
+            inputStream?.bufferedReader()?.use { reader ->
+                viewModel.restoreBackup(reader.readText()) {
+                    // Refresh or notify
+                }
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("My Bar") }
+                title = { 
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(end = 16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("My Bar")
+                        Text(
+                            text = "${uiState.recipes.size} Ready",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (uiState.recipes.isNotEmpty()) Color(0xFF4CAF50) else MaterialTheme.colorScheme.outline,
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { showSettings = true }) {
+                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                    }
+                }
             )
         }
     ) { padding ->
@@ -82,8 +133,7 @@ fun DashboardScreen(
                             RecipeItem(
                                 recipe = item.recipe,
                                 averageRating = item.averageRating,
-                                onClick = { onRecipeClick(item.recipe.id) }
-                            )
+                            ) { onRecipeClick(item.recipe.id) }
                         }
                     }
                 }
@@ -102,21 +152,65 @@ fun DashboardScreen(
                             RecipeItem(
                                 recipe = item.recipe,
                                 averageRating = item.averageRating,
-                                onClick = { onRecipeClick(item.recipe.id) }
-                            )
+                            ) { onRecipeClick(item.recipe.id) }
                         }
                     }
                 }
             }
         }
     }
+
+    if (showSettings) {
+        SettingsDialog(
+            onDismiss = { showSettings = false },
+            onExport = { 
+                showSettings = false
+                createDocumentLauncher.launch("cocktail_backup.json")
+            },
+        ) {
+            showSettings = false
+            openDocumentLauncher.launch(arrayOf("application/json"))
+        }
+    }
+}
+
+@Composable
+fun SettingsDialog(
+    onDismiss: () -> Unit,
+    onExport: () -> Unit,
+    onImport: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Settings & Maintenance") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text("Export your data to a file for backup, or restore from a previously saved file.", style = MaterialTheme.typography.bodyMedium)
+                
+                Button(onClick = onExport, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Default.Add, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Export Bar Backup")
+                }
+                
+                OutlinedButton(onClick = onImport, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Default.Clear, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Restore from Backup")
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Done") }
+        }
+    )
 }
 
 @Composable
 fun RecipeItem(
     recipe: CocktailRecipeEntity,
     averageRating: Float?,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)
@@ -126,9 +220,9 @@ fun RecipeItem(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (recipe.imageUri != null) {
+            recipe.imageUri?.let {
                 AsyncImage(
-                    model = recipe.imageUri,
+                    model = it,
                     contentDescription = null,
                     modifier = Modifier.size(64.dp),
                     contentScale = ContentScale.Crop
@@ -155,7 +249,6 @@ fun RecipeItem(
                                 tint = MaterialTheme.colorScheme.primary
                             )
                             Spacer(Modifier.width(4.dp))
-                            // Format to 1 decimal place, e.g., 4.5
                             val displayRating = (averageRating * 10).roundToInt() / 10f
                             Text(
                                 text = displayRating.toString(),

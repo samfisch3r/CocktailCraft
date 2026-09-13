@@ -14,7 +14,7 @@ import com.cocktailcraft.android.data.local.entity.*
         RecipeIngredientCrossRefEntity::class,
         RecipeVersionHistoryEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

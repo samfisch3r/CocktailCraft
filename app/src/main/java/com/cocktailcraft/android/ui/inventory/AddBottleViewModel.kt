@@ -1,6 +1,7 @@
 package com.cocktailcraft.android.ui.inventory
 
 import android.net.Uri
+import androidx.core.net.toUri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -22,18 +23,19 @@ data class AddBottleUiState(
     val availableIngredients: List<IngredientEntity> = emptyList(),
     val ingredientUsages: Map<Long, Int> = emptyMap(),
     val isTemporary: Boolean = false,
+    val inStock: Boolean = true,
     val notes: String = "",
     val imageUri: Uri? = null,
     val isSaved: Boolean = false,
     val isDeleted: Boolean = false,
-    val isInitialLoadDone: Boolean = false
+    val isInitialLoadDone: Boolean = false,
 )
 
 @HiltViewModel
 class AddBottleViewModel @Inject constructor(
     private val repository: CocktailRepository,
     private val filePersistenceHelper: FilePersistenceHelper,
-    savedStateHandle: SavedStateHandle
+    savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
     private val bottleId: Long? = savedStateHandle.toRoute<Destination.AddBottle>().bottleId
@@ -77,9 +79,10 @@ class AddBottleViewModel @Inject constructor(
                     name = bottle.name,
                     selectedIngredient = ingredient,
                     notes = bottle.notes ?: "",
-                    imageUri = bottle.imageUri?.let { Uri.parse(it) },
+                    imageUri = bottle.imageUri?.toUri(),
                     isTemporary = bottle.expiresAt != null,
-                    isInitialLoadDone = true
+                    inStock = bottle.inStock,
+                    isInitialLoadDone = true,
                 )
             }
         } else {
@@ -99,6 +102,10 @@ class AddBottleViewModel @Inject constructor(
         _uiState.update { it.copy(isTemporary = isTemporary) }
     }
 
+    fun onInStockChange(inStock: Boolean) {
+        _uiState.update { it.copy(inStock = inStock) }
+    }
+
     fun onNotesChange(notes: String) {
         _uiState.update { it.copy(notes = notes) }
     }
@@ -112,12 +119,10 @@ class AddBottleViewModel @Inject constructor(
 
     fun saveBottle() {
         val state = _uiState.value
-        if (state.name.isBlank() || state.selectedIngredient == null) return
+        if (state.name.isBlank() || (state.selectedIngredient == null)) return
 
         viewModelScope.launch {
             val expiresAt = if (state.isTemporary) {
-                // If editing and was already temporary, we could keep old expiry or refresh.
-                // Bartender preference: Refresh it to 1 week from now if they are "saving" it.
                 System.currentTimeMillis() + (7 * 24 * 60 * 60 * 1000L)
             } else null
 
@@ -127,7 +132,8 @@ class AddBottleViewModel @Inject constructor(
                 name = state.name,
                 notes = state.notes.takeIf { it.isNotBlank() },
                 imageUri = state.imageUri?.toString(),
-                expiresAt = expiresAt
+                expiresAt = expiresAt,
+                inStock = state.inStock,
             )
             
             if (state.bottleId == null) {
@@ -143,7 +149,6 @@ class AddBottleViewModel @Inject constructor(
         val id = _uiState.value.bottleId ?: return
         viewModelScope.launch {
             repository.deleteBottle(id)
-            repository.pruneUnusedIngredients()
             _uiState.update { it.copy(isDeleted = true) }
         }
     }
@@ -168,17 +173,9 @@ class AddBottleViewModel @Inject constructor(
         }
     }
 
-    fun pruneUnused() {
-        viewModelScope.launch {
-            repository.pruneUnusedIngredients()
-        }
-    }
-
     private fun refreshUsageCounts() {
         viewModelScope.launch {
-            val counts = _uiState.value.availableIngredients.associate { 
-                it.id to repository.getIngredientUsageCount(it.id)
-            }
+            val counts = _uiState.value.availableIngredients.associateBy({ it.id }, { repository.getIngredientUsageCount(it.id) })
             _uiState.update { it.copy(ingredientUsages = counts) }
         }
     }

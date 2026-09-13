@@ -1,7 +1,6 @@
 package com.cocktailcraft.android.ui.inventory
 
 import android.content.Intent
-import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -20,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import coil.compose.AsyncImage
 import com.cocktailcraft.android.data.local.entity.IngredientEntity
 
@@ -27,18 +27,17 @@ import com.cocktailcraft.android.data.local.entity.IngredientEntity
 @Composable
 fun AddBottleScreen(
     viewModel: AddBottleViewModel,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
-    var showAddIngredientDialog by remember { mutableStateOf(false) }
-    var showManageCatalogDialog by remember { mutableStateOf(false) }
-    var showDeleteConfirmation by remember { mutableStateOf(false) }
+    var showAddIngredientDialog by remember { mutableStateOf(value = false) }
+    var showManageCatalogDialog by remember { mutableStateOf(value = false) }
+    var showDeleteConfirmation by remember { mutableStateOf(value = false) }
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
-        onResult = { uri -> viewModel.onImageSelected(uri) }
-    )
+    ) { uri -> viewModel.onImageSelected(uri) }
 
     LaunchedEffect(uiState.isSaved, uiState.isDeleted) {
         if (uiState.isSaved || uiState.isDeleted) {
@@ -49,7 +48,7 @@ fun AddBottleScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (uiState.bottleId == null) "Add to Inventory" else "Edit Item") },
+                title = { Text(if (uiState.bottleId == null) "Add Item" else "Edit Item") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -64,17 +63,17 @@ fun AddBottleScreen(
                     IconButton(onClick = { showManageCatalogDialog = true }) {
                         Icon(Icons.Default.Settings, contentDescription = "Manage Catalog")
                     }
-                }
+                },
             )
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = { viewModel.saveBottle() },
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text("Save Item") }
+                text = { Text("Save Item") },
             )
         },
-        containerColor = MaterialTheme.colorScheme.background
+        containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->
         if (!uiState.isInitialLoadDone) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -89,37 +88,37 @@ fun AddBottleScreen(
                     .windowInsetsPadding(WindowInsets.ime)
                     .verticalScroll(rememberScrollState())
                     .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 OutlinedTextField(
                     value = uiState.name,
                     onValueChange = { viewModel.onNameChange(it) },
-                    label = { Text("Brand/Item Name (e.g. Tanqueray)") },
-                    modifier = Modifier.fillMaxWidth()
+                    label = { Text("Brand/Item Name (e.g. Gin Mare)") },
+                    modifier = Modifier.fillMaxWidth(),
                 )
 
-                if (uiState.imageUri != null) {
+                uiState.imageUri?.let {
                     AsyncImage(
-                        model = uiState.imageUri,
+                        model = it,
                         contentDescription = null,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(200.dp),
-                        contentScale = ContentScale.Fit
+                        contentScale = ContentScale.Fit,
                     )
                 }
                 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Button(
                         onClick = {
                             photoPickerLauncher.launch(
-                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                             )
                         },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
                     ) {
                         Icon(Icons.Default.PhotoCamera, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
@@ -128,11 +127,11 @@ fun AddBottleScreen(
                     
                     OutlinedButton(
                         onClick = {
-                            val query = if (uiState.name.isNotBlank()) uiState.name else "liquor bottle"
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/search?q=$query+bottle&tbm=isch"))
+                            val query = uiState.name.ifBlank { "liquor bottle" }
+                            val intent = Intent(Intent.ACTION_VIEW, "https://www.google.com/search?q=$query+bottle&tbm=isch".toUri())
                             context.startActivity(intent)
                         },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
                     ) {
                         Icon(Icons.Default.Search, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
@@ -143,18 +142,18 @@ fun AddBottleScreen(
                 Text(
                     text = "Link to Catalog Ingredient",
                     style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.primary,
                 )
                 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     IngredientPicker(
                         selected = uiState.selectedIngredient,
                         available = uiState.availableIngredients,
                         onSelected = { viewModel.onIngredientChange(it) },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
                     )
                     IconButton(onClick = { showAddIngredientDialog = true }) {
                         Icon(Icons.Default.Add, contentDescription = "New Ingredient Type")
@@ -163,12 +162,23 @@ fun AddBottleScreen(
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text(text = "Perishable (disappears in 1 week)", modifier = Modifier.weight(1f))
+                    Text(text = "Currently In Stock", modifier = Modifier.weight(1f))
+                    Switch(
+                        checked = uiState.inStock,
+                        onCheckedChange = { viewModel.onInStockChange(it) },
+                    )
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(text = "Perishable (expires in 1 week)", modifier = Modifier.weight(1f))
                     Switch(
                         checked = uiState.isTemporary,
-                        onCheckedChange = { viewModel.onTemporaryChange(it) }
+                        onCheckedChange = { viewModel.onTemporaryChange(it) },
                     )
                 }
 
@@ -177,7 +187,7 @@ fun AddBottleScreen(
                     onValueChange = { viewModel.onNotesChange(it) },
                     label = { Text("Notes (optional)") },
                     modifier = Modifier.fillMaxWidth(),
-                    minLines = 3
+                    minLines = 3,
                 )
                 
                 Spacer(modifier = Modifier.height(80.dp))
@@ -188,11 +198,10 @@ fun AddBottleScreen(
     if (showAddIngredientDialog) {
         NewIngredientDialog(
             onDismiss = { showAddIngredientDialog = false },
-            onSave = { name ->
-                viewModel.onAddNewIngredient(name)
-                showAddIngredientDialog = false
-            }
-        )
+        ) { name ->
+            viewModel.onAddNewIngredient(name)
+            showAddIngredientDialog = false
+        }
     }
 
     if (showManageCatalogDialog) {
@@ -201,7 +210,7 @@ fun AddBottleScreen(
             usages = uiState.ingredientUsages,
             onDismiss = { showManageCatalogDialog = false },
             onDelete = { viewModel.deleteCatalogIngredient(it) },
-            onRename = { ingredient, newName -> viewModel.renameIngredient(ingredient, newName) }
+            onRename = { ingredient, newName -> viewModel.renameIngredient(ingredient, newName) },
         )
     }
 
@@ -216,7 +225,7 @@ fun AddBottleScreen(
                         viewModel.deleteBottle()
                         showDeleteConfirmation = false
                     },
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
                 ) {
                     Text("Delete")
                 }
@@ -225,7 +234,7 @@ fun AddBottleScreen(
                 TextButton(onClick = { showDeleteConfirmation = false }) {
                     Text("Cancel")
                 }
-            }
+            },
         )
     }
 }
@@ -236,7 +245,7 @@ fun ManageCatalogDialog(
     usages: Map<Long, Int>,
     onDismiss: () -> Unit,
     onDelete: (IngredientEntity) -> Unit,
-    onRename: (IngredientEntity, String) -> Unit
+    onRename: (IngredientEntity, String) -> Unit,
 ) {
     var editingIngredient by remember { mutableStateOf<IngredientEntity?>(null) }
     var editName by remember { mutableStateOf("") }
@@ -248,14 +257,14 @@ fun ManageCatalogDialog(
             Column {
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(ingredients) { ingredient ->
                         val usageCount = usages[ingredient.id] ?: 0
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            horizontalArrangement = Arrangement.SpaceBetween,
                         ) {
                             if (editingIngredient?.id == ingredient.id) {
                                 OutlinedTextField(
@@ -269,7 +278,7 @@ fun ManageCatalogDialog(
                                         }) {
                                             Icon(Icons.Default.Check, contentDescription = "Save")
                                         }
-                                    }
+                                    },
                                 )
                             } else {
                                 Column(modifier = Modifier.weight(1f)) {
@@ -277,7 +286,7 @@ fun ManageCatalogDialog(
                                     Text(
                                         text = if (usageCount > 0) "Used in $usageCount items" else "Unused",
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = if (usageCount > 0) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outline
+                                        color = if (usageCount > 0) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outline,
                                     )
                                 }
                                 Row {
@@ -289,12 +298,12 @@ fun ManageCatalogDialog(
                                     }
                                     IconButton(
                                         onClick = { onDelete(ingredient) },
-                                        enabled = usageCount == 0
+                                        enabled = usageCount == 0,
                                     ) {
                                         Icon(
                                             Icons.Default.Delete, 
                                             contentDescription = "Delete", 
-                                            tint = if (usageCount == 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline
+                                            tint = if (usageCount == 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline,
                                         )
                                     }
                                 }
@@ -307,7 +316,7 @@ fun ManageCatalogDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) { Text("Done") }
-        }
+        },
     )
 }
 
@@ -317,14 +326,14 @@ fun IngredientPicker(
     selected: IngredientEntity?,
     available: List<IngredientEntity>,
     onSelected: (IngredientEntity) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
-    var expanded by remember { mutableStateOf(false) }
+    var expanded by remember { mutableStateOf(value = false) }
 
     ExposedDropdownMenuBox(
         expanded = expanded,
         onExpandedChange = { expanded = !expanded },
-        modifier = modifier
+        modifier = modifier,
     ) {
         OutlinedTextField(
             value = selected?.name ?: "Select Catalog Ingredient (e.g. Gin)",
@@ -332,11 +341,11 @@ fun IngredientPicker(
             readOnly = true,
             label = { Text("Required for Recipes") },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable).fillMaxWidth()
+            modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable).fillMaxWidth(),
         )
         ExposedDropdownMenu(
             expanded = expanded,
-            onDismissRequest = { expanded = false }
+            onDismissRequest = { expanded = false },
         ) {
             available.forEach { ingredient ->
                 DropdownMenuItem(
@@ -344,7 +353,7 @@ fun IngredientPicker(
                     onClick = {
                         onSelected(ingredient)
                         expanded = false
-                    }
+                    },
                 )
             }
         }
@@ -354,7 +363,7 @@ fun IngredientPicker(
 @Composable
 fun NewIngredientDialog(
     onDismiss: () -> Unit,
-    onSave: (String) -> Unit
+    onSave: (String) -> Unit,
 ) {
     var name by remember { mutableStateOf("") }
 
@@ -366,7 +375,7 @@ fun NewIngredientDialog(
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Name (e.g. Gin)") }
+                    label = { Text("Name (e.g. Gin)") },
                 )
             }
         },
@@ -379,6 +388,6 @@ fun NewIngredientDialog(
             TextButton(onClick = onDismiss) {
                 Text("Cancel")
             }
-        }
+        },
     )
 }

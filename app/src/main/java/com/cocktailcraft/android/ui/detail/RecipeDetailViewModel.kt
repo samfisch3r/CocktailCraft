@@ -10,17 +10,16 @@ import com.cocktailcraft.android.ui.navigation.Destination
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import javax.inject.Inject
 
 data class RecipeDetailUiState(
     val recipe: CocktailRecipeEntity? = null,
     val ingredients: List<RecipeIngredient> = emptyList(),
-    val versions: List<RecipeVersionHistoryEntity> = emptyList(),
+    val ratings: List<RecipeVersionHistoryEntity> = emptyList(),
     val isLoading: Boolean = true,
-    val selectedVersion: RecipeVersionHistoryEntity? = null,
-    val selectedVersionIngredients: List<IngredientSnapshot> = emptyList(),
+    val selectedRating: RecipeVersionHistoryEntity? = null,
+    val selectedRatingIngredients: List<IngredientSnapshot> = emptyList(),
     val matchingBottles: List<BottleStockEntity> = emptyList(),
     val selectedIngredientName: String? = null
 )
@@ -56,15 +55,15 @@ class RecipeDetailViewModel @Inject constructor(
         }
         
         repository.getVersionHistory(recipeId)
-            .onEach { versions ->
-                _uiState.update { it.copy(versions = versions) }
+            .onEach { ratings ->
+                _uiState.update { it.copy(ratings = ratings) }
             }
             .launchIn(viewModelScope)
     }
 
     fun loadMatchingBottles(ingredientId: Long, ingredientName: String) {
         viewModelScope.launch {
-            val bottles = repository.getBottlesForIngredient(ingredientId, System.currentTimeMillis())
+            val bottles = repository.getBottlesForIngredient(ingredientId)
             _uiState.update { 
                 it.copy(
                     matchingBottles = bottles,
@@ -83,7 +82,7 @@ class RecipeDetailViewModel @Inject constructor(
         }
     }
 
-    fun addTweak(rating: Float, notes: String?) {
+    fun addRating(rating: Float, notes: String?) {
         val currentState = _uiState.value
         val currentRecipe = currentState.recipe ?: return
         
@@ -99,10 +98,10 @@ class RecipeDetailViewModel @Inject constructor(
                 )
             }
             
-            val nextVersion = (currentState.versions.maxOfOrNull { it.versionNumber } ?: 0) + 1
-            val version = RecipeVersionHistoryEntity(
+            val nextRatingNumber = (currentState.ratings.maxOfOrNull { it.versionNumber } ?: 0) + 1
+            val ratingEntry = RecipeVersionHistoryEntity(
                 recipeId = recipeId,
-                versionNumber = nextVersion,
+                versionNumber = nextRatingNumber,
                 timestamp = System.currentTimeMillis(),
                 rating = rating,
                 tweakNotes = notes,
@@ -110,35 +109,35 @@ class RecipeDetailViewModel @Inject constructor(
                 glassType = currentRecipe.glassType,
                 ingredientsJson = Json.encodeToString(snapshots)
             )
-            repository.addVersion(version)
+            repository.addVersion(ratingEntry)
         }
     }
 
-    fun selectVersion(version: RecipeVersionHistoryEntity?) {
-        val ingredients = if (version != null) {
+    fun selectRating(rating: RecipeVersionHistoryEntity?) {
+        val ingredients = if (rating != null) {
             try {
-                Json.decodeFromString<List<IngredientSnapshot>>(version.ingredientsJson)
-            } catch (e: Exception) {
+                Json.decodeFromString<List<IngredientSnapshot>>(rating.ingredientsJson)
+            } catch (_: Exception) {
                 emptyList()
             }
         } else {
             emptyList()
         }
         
-        _uiState.update { it.copy(selectedVersion = version, selectedVersionIngredients = ingredients) }
+        _uiState.update { it.copy(selectedRating = rating, selectedRatingIngredients = ingredients) }
     }
 
-    fun restoreVersion(version: RecipeVersionHistoryEntity) {
+    fun restoreRating(rating: RecipeVersionHistoryEntity) {
         val currentRecipe = _uiState.value.recipe ?: return
         viewModelScope.launch {
             val restoredRecipe = currentRecipe.copy(
-                instructions = version.instructions,
-                glassType = version.glassType
+                instructions = rating.instructions,
+                glassType = rating.glassType
             )
             
             val snapshots: List<IngredientSnapshot> = try {
-                Json.decodeFromString(version.ingredientsJson)
-            } catch (e: Exception) {
+                Json.decodeFromString(rating.ingredientsJson)
+            } catch (_: Exception) {
                 emptyList()
             }
             
@@ -153,7 +152,7 @@ class RecipeDetailViewModel @Inject constructor(
             }
             
             repository.saveRecipe(restoredRecipe, ingredientRefs)
-            selectVersion(null)
+            selectRating(null)
             loadRecipeData() // Refresh UI
         }
     }
@@ -162,7 +161,6 @@ class RecipeDetailViewModel @Inject constructor(
         val recipe = _uiState.value.recipe ?: return
         viewModelScope.launch {
             repository.deleteRecipe(recipe)
-            repository.pruneUnusedIngredients()
             onSuccess()
         }
     }

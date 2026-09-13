@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -26,11 +27,11 @@ import com.cocktailcraft.android.data.local.entity.RecipeWithMissingCount
 fun InventoryScreen(
     viewModel: InventoryViewModel,
     onAddBottleClick: (Long?) -> Unit,
-    onRecipeClick: (Long) -> Unit
+    onRecipeClick: (Long) -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val sheetState = rememberModalBottomSheetState()
-    var showRecipesSheet by remember { mutableStateOf(false) }
+    var showRecipesSheet by remember { mutableStateOf(value = false) }
 
     LaunchedEffect(uiState.selectedBottle) {
         if (uiState.selectedBottle != null) {
@@ -41,7 +42,20 @@ fun InventoryScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Inventory") }
+                title = { 
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(end = 16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("Inventory")
+                        Text(
+                            text = "${uiState.bottles.size} Items",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.outline,
+                        )
+                    }
+                }
             )
         },
         floatingActionButton = {
@@ -55,13 +69,13 @@ fun InventoryScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // Search Bar
+            // Search Bar - Aligned with Library
             OutlinedTextField(
                 value = uiState.searchQuery,
                 onValueChange = { viewModel.onSearchQueryChange(it) },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
                 placeholder = { Text("Search inventory...") },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                 trailingIcon = if (uiState.searchQuery.isNotEmpty()) {
@@ -72,21 +86,21 @@ fun InventoryScreen(
                     }
                 } else null,
                 singleLine = true,
-                shape = MaterialTheme.shapes.medium
+                shape = MaterialTheme.shapes.medium,
             )
 
             if (uiState.bottles.isEmpty() && uiState.searchQuery.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Text("No bottles in inventory. Add some!")
+                    Text("Your bar is empty. Add some items!")
                 }
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(uiState.bottles) { bottle ->
                         InventoryCard(
@@ -94,39 +108,36 @@ fun InventoryScreen(
                             onImageClick = { viewModel.showImage(bottle.imageUri) },
                             onContentClick = { viewModel.selectBottle(bottle) },
                             onEditClick = { onAddBottleClick(bottle.id) },
-                            onRefresh = { viewModel.refreshBottle(bottle.id) }
-                        )
+                        ) { viewModel.refreshBottle(bottle.id) }
                     }
                 }
             }
         }
     }
 
-    if (showRecipesSheet && uiState.selectedBottle != null) {
+    if (showRecipesSheet && (uiState.selectedBottle != null)) {
         ModalBottomSheet(
             onDismissRequest = { 
                 showRecipesSheet = false
                 viewModel.selectBottle(null)
             },
-            sheetState = sheetState
+            sheetState = sheetState,
         ) {
             MatchingRecipesList(
                 bottle = uiState.selectedBottle!!,
                 recipes = uiState.matchingRecipes,
-                onRecipeClick = { 
-                    showRecipesSheet = false
-                    viewModel.selectBottle(null)
-                    onRecipeClick(it)
-                }
-            )
+            ) { 
+                showRecipesSheet = false
+                viewModel.selectBottle(null)
+                onRecipeClick(it)
+            }
         }
     }
 
     uiState.selectedImageUri?.let { uri ->
         FullImageDialog(
             imageUri = uri,
-            onDismiss = { viewModel.hideImage() }
-        )
+        ) { viewModel.hideImage() }
     }
 }
 
@@ -136,13 +147,19 @@ fun InventoryCard(
     onImageClick: () -> Unit,
     onContentClick: () -> Unit,
     onEditClick: () -> Unit,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    val isActuallyInStock = bottle.inStock && ((bottle.expiresAt == null) || (bottle.expiresAt > System.currentTimeMillis()))
+    
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .alpha(if (isActuallyInStock) 1f else 0.6f),
+    ) {
         Row(
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             // Left: Image
             if (bottle.imageUri != null) {
@@ -152,20 +169,20 @@ fun InventoryCard(
                     modifier = Modifier
                         .size(64.dp)
                         .clickable(onClick = onImageClick),
-                    contentScale = ContentScale.Fit
+                    contentScale = ContentScale.Fit,
                 )
             } else {
                 Box(
                     modifier = Modifier
                         .size(64.dp)
                         .padding(8.dp),
-                    contentAlignment = Alignment.Center
+                    contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         imageVector = Icons.Default.WineBar,
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize(),
-                        tint = MaterialTheme.colorScheme.outline
+                        tint = MaterialTheme.colorScheme.outline,
                     )
                 }
             }
@@ -174,29 +191,45 @@ fun InventoryCard(
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .clickable(onClick = onContentClick)
+                    .clickable(onClick = onContentClick),
             ) {
-                Text(text = bottle.brandName, style = MaterialTheme.typography.titleLarge)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(text = bottle.brandName, style = MaterialTheme.typography.titleLarge)
+                    if (!isActuallyInStock) {
+                        Spacer(Modifier.width(8.dp))
+                        Surface(
+                            color = MaterialTheme.colorScheme.errorContainer,
+                            shape = MaterialTheme.shapes.extraSmall,
+                        ) {
+                            Text(
+                                text = "EMPTY",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                            )
+                        }
+                    }
+                }
                 Text(
                     text = bottle.ingredientName,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.secondary
+                    color = MaterialTheme.colorScheme.secondary,
                 )
                 if (bottle.expiresAt != null) {
                     val remainingDays = ((bottle.expiresAt - System.currentTimeMillis()) / (24 * 60 * 60 * 1000L)).coerceAtLeast(0)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = "Expires in $remainingDays days",
+                            text = if (remainingDays > 0) "Expires in $remainingDays days" else "Expired",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
                         )
                         IconButton(onClick = onRefresh, modifier = Modifier.size(24.dp)) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.RotateRight,
                                 contentDescription = "Refresh Timer",
                                 tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(16.dp),
                             )
                         }
                     }
@@ -212,7 +245,7 @@ fun InventoryCard(
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.NavigateNext,
                     contentDescription = "Edit Bottle",
-                    tint = MaterialTheme.colorScheme.outline
+                    tint = MaterialTheme.colorScheme.outline,
                 )
             }
         }
@@ -223,23 +256,23 @@ fun InventoryCard(
 fun MatchingRecipesList(
     bottle: BottleItem,
     recipes: List<RecipeWithMissingCount>,
-    onRecipeClick: (Long) -> Unit
+    onRecipeClick: (Long) -> Unit,
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = 32.dp)
+            .padding(bottom = 32.dp),
     ) {
         Column(modifier = Modifier.padding(horizontal = 24.dp)) {
             Text(
                 text = "What can I make with...",
                 style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary
+                color = MaterialTheme.colorScheme.primary,
             )
             Text(
                 text = bottle.brandName,
                 style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
             )
         }
         
@@ -250,7 +283,7 @@ fun MatchingRecipesList(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(48.dp),
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
                 Text("No matching recipes in your library.")
             }
@@ -258,7 +291,7 @@ fun MatchingRecipesList(
             LazyColumn(
                 modifier = Modifier.fillMaxWidth(),
                 contentPadding = PaddingValues(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(recipes) { recipeWithCount ->
                     val recipe = recipeWithCount.recipe
@@ -266,19 +299,19 @@ fun MatchingRecipesList(
                     
                     Card(
                         onClick = { onRecipeClick(recipe.id) },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
                         Row(
                             modifier = Modifier.padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
-                            if (recipe.imageUri != null) {
+                            recipe.imageUri?.let {
                                 AsyncImage(
-                                    model = recipe.imageUri,
+                                    model = it,
                                     contentDescription = null,
                                     modifier = Modifier.size(48.dp),
-                                    contentScale = ContentScale.Crop
+                                    contentScale = ContentScale.Crop,
                                 )
                             }
                             Column(modifier = Modifier.weight(1f)) {
@@ -289,13 +322,13 @@ fun MatchingRecipesList(
                                         text = "Ready to make",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = Color(0xFF4CAF50),
-                                        fontWeight = FontWeight.Bold
+                                        fontWeight = FontWeight.Bold,
                                     )
                                 } else {
                                     Text(
                                         text = "Missing $missingCount other ingredients",
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.error
+                                        color = MaterialTheme.colorScheme.error,
                                     )
                                 }
                             }
@@ -310,18 +343,18 @@ fun MatchingRecipesList(
 @Composable
 fun FullImageDialog(
     imageUri: String,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .wrapContentHeight()
-                .padding(16.dp)
+                .padding(16.dp),
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(8.dp)
+                modifier = Modifier.padding(8.dp),
             ) {
                 AsyncImage(
                     model = imageUri,
@@ -329,7 +362,7 @@ fun FullImageDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(max = 500.dp),
-                    contentScale = ContentScale.Fit
+                    contentScale = ContentScale.Fit,
                 )
                 TextButton(onClick = onDismiss) {
                     Text("Close")

@@ -8,10 +8,12 @@ import androidx.room.PrimaryKey
 import kotlinx.serialization.Serializable
 import com.cocktailcraft.android.R
 
+@Serializable
 enum class SourceType {
     CLASSIC, ORIGINAL, COMMUNITY
 }
 
+@Serializable
 enum class GlassType(
     val displayName: String,
     val iconRes: Int,
@@ -44,7 +46,7 @@ enum class GlassType(
     ),
     COPA_GLASS(
         "Copa Glass",
-        R.drawable.ic_glass_wine, // Using wine glass vector as base for Copa
+        R.drawable.ic_glass_wine,
         "A large, balloon-shaped glass. The modern standard for a Gin & Tonic with plenty of garnish."
     ),
     MULE_MUG(
@@ -59,7 +61,7 @@ enum class GlassType(
     ),
     RUM_GLASS(
         "Rum Glass",
-        R.drawable.ic_glass_wine, // Using wine/tulip vector as base for Rum Glass
+        R.drawable.ic_glass_wine,
         "A tulip or snifter-shaped glass designed to concentrate the aromas of aged spirits."
     ),
     SHOT_GLASS(
@@ -93,6 +95,7 @@ enum class IngredientUnit {
         }
 }
 
+@Serializable
 @Entity(tableName = "ingredient")
 data class IngredientEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -100,6 +103,7 @@ data class IngredientEntity(
     val isPerishable: Boolean
 )
 
+@Serializable
 @Entity(
     tableName = "bottle_stock",
     foreignKeys = [
@@ -118,9 +122,11 @@ data class BottleStockEntity(
     val name: String, // Brand name
     val notes: String?,
     val imageUri: String?,
-    val expiresAt: Long? = null
+    val expiresAt: Long? = null,
+    val inStock: Boolean = true
 )
 
+@Serializable
 @Entity(tableName = "cocktail_recipe")
 data class CocktailRecipeEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -131,6 +137,7 @@ data class CocktailRecipeEntity(
     val sourceType: SourceType
 )
 
+@Serializable
 @Entity(
     tableName = "recipe_ingredient_xref",
     foreignKeys = [
@@ -183,7 +190,8 @@ data class BottleItem(
     val ingredientName: String,
     val notes: String?,
     val expiresAt: Long?,
-    val imageUri: String?
+    val imageUri: String?,
+    val inStock: Boolean
 )
 
 data class RecipeWithMissingCount(
@@ -208,6 +216,7 @@ data class IngredientSnapshot(
     val preferredBrand: String? = null
 )
 
+@Serializable
 @Entity(
     tableName = "recipe_version_history",
     foreignKeys = [

@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -25,14 +26,27 @@ import com.cocktailcraft.android.data.local.entity.CocktailRecipeEntity
 fun RecipeLibraryScreen(
     viewModel: RecipeLibraryViewModel,
     onRecipeClick: (Long) -> Unit,
-    onAddRecipeClick: () -> Unit
+    onAddRecipeClick: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Library") }
+                title = { 
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(end = 16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("Library")
+                        Text(
+                            text = "${uiState.recipes.size} Recipes",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.outline,
+                        )
+                    }
+                }
             )
         },
         floatingActionButton = {
@@ -46,7 +60,6 @@ fun RecipeLibraryScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // Search Bar
             OutlinedTextField(
                 value = uiState.searchQuery,
                 onValueChange = { viewModel.onSearchQueryChange(it) },
@@ -55,6 +68,13 @@ fun RecipeLibraryScreen(
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 placeholder = { Text("Search recipes...") },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                trailingIcon = if (uiState.searchQuery.isNotEmpty()) {
+                    {
+                        IconButton(onClick = { viewModel.onSearchQueryChange("") }) {
+                            Icon(Icons.Default.Clear, contentDescription = "Clear search")
+                        }
+                    }
+                } else null,
                 singleLine = true,
                 shape = MaterialTheme.shapes.medium
             )
@@ -65,7 +85,7 @@ fun RecipeLibraryScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 item {
                     FilterChip(
@@ -90,8 +110,7 @@ fun RecipeLibraryScreen(
                         RecipeLibraryItem(
                             recipe = recipeWithCount.recipe,
                             missingCount = recipeWithCount.missingCount,
-                            onClick = { onRecipeClick(recipeWithCount.recipe.id) }
-                        )
+                        ) { onRecipeClick(recipeWithCount.recipe.id) }
                     }
                     if (uiState.recipes.isEmpty()) {
                         item {
@@ -110,7 +129,7 @@ fun RecipeLibraryScreen(
 fun RecipeLibraryItem(
     recipe: CocktailRecipeEntity,
     missingCount: Int,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)
@@ -120,9 +139,9 @@ fun RecipeLibraryItem(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (recipe.imageUri != null) {
+            recipe.imageUri?.let {
                 AsyncImage(
-                    model = recipe.imageUri,
+                    model = it,
                     contentDescription = null,
                     modifier = Modifier.size(64.dp),
                     contentScale = ContentScale.Crop

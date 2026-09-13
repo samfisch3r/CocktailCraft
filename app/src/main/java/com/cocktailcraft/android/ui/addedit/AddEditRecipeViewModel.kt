@@ -1,6 +1,7 @@
 package com.cocktailcraft.android.ui.addedit
 
 import android.net.Uri
+import androidx.core.net.toUri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -59,7 +60,7 @@ class AddEditRecipeViewModel @Inject constructor(
     init {
         combine(
             repository.getAllIngredients(),
-            repository.getAllBottles(System.currentTimeMillis())
+            repository.getAllBottles()
         ) { ingredients, bottles ->
             val usages = ingredients.associate { it.id to repository.getIngredientUsageCount(it.id) }
             _uiState.update { it.copy(
@@ -89,7 +90,7 @@ class AddEditRecipeViewModel @Inject constructor(
                     instructions = recipe.instructions,
                     glassType = recipe.glassType,
                     sourceType = recipe.sourceType,
-                    imageUri = recipe.imageUri?.let { Uri.parse(it) },
+                    imageUri = recipe.imageUri?.toUri(),
                     ingredients = ingredients.map { ing ->
                         IngredientInputState(
                             ingredient = state.availableIngredients.find { it.id == ing.ingredientId },
@@ -140,7 +141,7 @@ class AddEditRecipeViewModel @Inject constructor(
                 } else {
                     _uiState.update { it.copy(isFetching = false, searchResults = emptyList()) }
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 _uiState.update { it.copy(isFetching = false, searchResults = emptyList()) }
             }
         }
@@ -179,7 +180,7 @@ class AddEditRecipeViewModel @Inject constructor(
                     glassType = remote.glassType,
                     sourceType = SourceType.CLASSIC,
                     ingredients = mappedIngredients.ifEmpty { listOf(IngredientInputState()) },
-                    imageUri = remote.imageUri?.let { url -> Uri.parse(url) },
+                    imageUri = remote.imageUri?.toUri(),
                     isFetching = false,
                     searchResults = emptyList()
                 )
@@ -232,12 +233,6 @@ class AddEditRecipeViewModel @Inject constructor(
         }
     }
 
-    fun pruneUnused() {
-        viewModelScope.launch {
-            repository.pruneUnusedIngredients()
-        }
-    }
-
     fun saveRecipe() {
         val currentState = _uiState.value
         if (currentState.name.isBlank()) return
@@ -276,7 +271,6 @@ class AddEditRecipeViewModel @Inject constructor(
             )
             
             repository.saveRecipe(recipe, finalIngredientRefs)
-            repository.pruneUnusedIngredients()
             _uiState.update { it.copy(isSaving = false, isSaved = true) }
         }
     }
