@@ -9,6 +9,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import java.text.Collator
 import javax.inject.Inject
 
 data class DashboardUiState(
@@ -27,9 +28,14 @@ class DashboardViewModel @Inject constructor(
         repository.getAvailableRecipes(System.currentTimeMillis()),
         repository.getUnratedRecipes()
     ) { available, unrated ->
-        val availableIds = available.asSequence().map { it.recipe.id }.toSet()
+        val collator = Collator.getInstance()
+        val sortedAvailable = available.sortedWith(
+            compareBy<RecipeWithRating> { it.averageRating != null }
+                .thenComparator { a, b -> collator.compare(a.recipe.name, b.recipe.name) }
+        )
+        val availableIds = sortedAvailable.asSequence().map { it.recipe.id }.toSet()
         DashboardUiState(
-            recipes = available,
+            recipes = sortedAvailable,
             unratedRecipes = unrated.filter { it.recipe.id !in availableIds }.take(5),
             isLoading = false,
         )

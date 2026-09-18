@@ -172,6 +172,7 @@ interface CocktailDao {
                 OR
                 (preferredBrand IS NOT NULL AND assignedBottleId IS NULL AND xref.ingredientId NOT IN (SELECT ingredientId FROM bottle_stock WHERE LOWER(name) = LOWER(xref.preferredBrand) AND inStock = 1 AND (expiresAt IS NULL OR expiresAt > :currentTime)))
         )
+        ORDER BY (CASE WHEN (SELECT AVG(rating) FROM recipe_version_history WHERE recipeId = r.id) IS NULL THEN 0 ELSE 1 END) ASC, r.name COLLATE NOCASE ASC
     """)
     fun getAvailableRecipesWithRating(currentTime: Long): Flow<List<RecipeWithRating>>
 
