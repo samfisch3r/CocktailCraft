@@ -15,13 +15,17 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.cocktailcraft.android.data.local.entity.CocktailRecipeEntity
+import com.cocktailcraft.android.data.local.entity.RecipeWithRating
+import com.cocktailcraft.android.util.OnShakeListener
 import java.io.InputStream
 import kotlin.math.roundToInt
 
@@ -34,6 +38,27 @@ fun DashboardScreen(
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     var showSettings by remember { mutableStateOf(value = false) }
+    var surpriseRecipe by remember { mutableStateOf<RecipeWithRating?>(null) }
+
+    fun pickSurpriseRecipe() {
+        val availableCandidates = uiState.recipes.filter { it.averageRating == null || it.averageRating > 2.0f }
+        val pool = availableCandidates.ifEmpty {
+            uiState.unratedRecipes.filter { it.averageRating == null || it.averageRating > 2.0f }
+        }
+        if (pool.isNotEmpty()) {
+            val currentId = surpriseRecipe?.recipe?.id
+            val candidates = if (pool.size > 1 && currentId != null) {
+                pool.filter { it.recipe.id != currentId }
+            } else {
+                pool
+            }
+            surpriseRecipe = candidates.random()
+        }
+    }
+
+    OnShakeListener(enabled = uiState.recipes.isNotEmpty() || uiState.unratedRecipes.isNotEmpty()) {
+        pickSurpriseRecipe()
+    }
 
     val createDocumentLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json"),
@@ -108,7 +133,7 @@ fun DashboardScreen(
                     Text(
                         text = "Add some bottles to your inventory and recipes to your library to get started.",
                         style = MaterialTheme.typography.bodyMedium,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        textAlign = TextAlign.Center
                     )
                 }
             }
@@ -122,11 +147,24 @@ fun DashboardScreen(
             ) {
                 if (uiState.recipes.isNotEmpty()) {
                     item {
-                        Text(
-                            text = "What You Can Make Now",
-                            style = MaterialTheme.typography.titleLarge,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
-                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "What You Can Make Now",
+                                style = MaterialTheme.typography.titleLarge
+                            )
+                            FilledTonalButton(
+                                onClick = { pickSurpriseRecipe() },
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Text("🎲 Surprise Me")
+                            }
+                        }
                     }
                     items(uiState.recipes) { item ->
                         Box(modifier = Modifier.padding(horizontal = 16.dp)) {
@@ -172,6 +210,113 @@ fun DashboardScreen(
             openDocumentLauncher.launch(arrayOf("application/json"))
         }
     }
+
+    surpriseRecipe?.let { selected ->
+        SurpriseRecipeDialog(
+            recipeWithRating = selected,
+            onDismiss = { surpriseRecipe = null },
+            onReshuffle = { pickSurpriseRecipe() },
+            onRecipeClick = { id ->
+                surpriseRecipe = null
+                onRecipeClick(id)
+            }
+        )
+    }
+}
+
+@Composable
+fun SurpriseRecipeDialog(
+    recipeWithRating: RecipeWithRating,
+    onDismiss: () -> Unit,
+    onReshuffle: () -> Unit,
+    onRecipeClick: (Long) -> Unit,
+) {
+    val recipe = recipeWithRating.recipe
+    val rating = recipeWithRating.averageRating
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Tonight's Choice",
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center
+            )
+        },
+        text = {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                recipe.imageUri?.let { uri ->
+                    AsyncImage(
+                        model = uri,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 200.dp)
+                            .clip(MaterialTheme.shapes.medium),
+                        contentScale = ContentScale.Fit
+                    )
+                }
+
+                Text(
+                    text = recipe.name,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
+
+                if (rating != null) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Star,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        val displayRating = (rating * 10).roundToInt() / 10f
+                        Text(
+                            text = "$displayRating / 5.0",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                } else {
+                    Text(
+                        text = "Unrated",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onReshuffle,
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 8.dp)
+                ) {
+                    Text("🎲 Reshuffle")
+                }
+                Button(
+                    onClick = {
+                        onDismiss()
+                        onRecipeClick(recipe.id)
+                    },
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 8.dp)
+                ) {
+                    Text("🍸 Let's Make It!")
+                }
+            }
+        }
+    )
 }
 
 @Composable
