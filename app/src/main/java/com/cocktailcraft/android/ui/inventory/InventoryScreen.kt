@@ -21,6 +21,7 @@ import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
 import com.cocktailcraft.android.data.local.entity.BottleItem
 import com.cocktailcraft.android.data.local.entity.RecipeWithMissingCount
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -296,6 +297,7 @@ fun MatchingRecipesList(
                 items(recipes) { recipeWithCount ->
                     val recipe = recipeWithCount.recipe
                     val missingCount = recipeWithCount.missingCount
+                    val averageRating = recipeWithCount.averageRating
                     
                     Card(
                         onClick = { onRecipeClick(recipe.id) },
@@ -315,7 +317,34 @@ fun MatchingRecipesList(
                                 )
                             }
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(text = recipe.name, style = MaterialTheme.typography.titleMedium)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        text = recipe.name,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    if (averageRating != null) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                imageVector = Icons.Default.Star,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(16.dp),
+                                                tint = MaterialTheme.colorScheme.primary,
+                                            )
+                                            Spacer(Modifier.width(4.dp))
+                                            val displayRating = (averageRating * 10).roundToInt() / 10f
+                                            Text(
+                                                text = displayRating.toString(),
+                                                style = MaterialTheme.typography.labelMedium,
+                                                fontWeight = FontWeight.Bold,
+                                            )
+                                        }
+                                    }
+                                }
                                 
                                 if (missingCount == 0) {
                                     Text(
