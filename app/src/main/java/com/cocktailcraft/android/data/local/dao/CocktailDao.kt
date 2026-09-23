@@ -89,6 +89,9 @@ interface CocktailDao {
     @Query("SELECT * FROM cocktail_recipe WHERE id = :recipeId")
     suspend fun getRecipeById(recipeId: Long): CocktailRecipeEntity?
 
+    @Query("SELECT * FROM cocktail_recipe WHERE id = :recipeId")
+    fun getRecipeByIdFlow(recipeId: Long): Flow<CocktailRecipeEntity?>
+
     @Delete
     suspend fun deleteRecipe(recipe: CocktailRecipeEntity)
 
@@ -119,6 +122,31 @@ interface CocktailDao {
         WHERE xref.recipeId = :recipeId
     """)
     suspend fun getDetailedIngredientsForRecipe(recipeId: Long, currentTime: Long): List<RecipeIngredient>
+
+    @Query("""
+        SELECT 
+            i.id as ingredientId, 
+            i.name as ingredientName, 
+            xref.amount, 
+            xref.unit,
+            xref.assignedBottleId,
+            xref.preferredBrand,
+            b_assigned.name as assignedBottleName,
+            CASE 
+                WHEN xref.assignedBottleId IS NOT NULL THEN 
+                    (SELECT COUNT(*) FROM bottle_stock WHERE id = xref.assignedBottleId AND inStock = 1 AND (expiresAt IS NULL OR expiresAt > :currentTime)) > 0
+                WHEN xref.preferredBrand IS NOT NULL THEN 
+                    (SELECT COUNT(*) FROM bottle_stock WHERE ingredientId = i.id AND LOWER(name) = LOWER(xref.preferredBrand) AND inStock = 1 AND (expiresAt IS NULL OR expiresAt > :currentTime)) > 0
+                ELSE 
+                    (SELECT COUNT(*) FROM bottle_stock WHERE ingredientId = i.id AND inStock = 1 AND (expiresAt IS NULL OR expiresAt > :currentTime)) > 0
+            END as isAvailable,
+            (SELECT GROUP_CONCAT(name, ', ') FROM bottle_stock WHERE ingredientId = i.id AND inStock = 1 AND (expiresAt IS NULL OR expiresAt > :currentTime)) as bottleNames
+        FROM recipe_ingredient_xref AS xref
+        JOIN ingredient AS i ON xref.ingredientId = i.id
+        LEFT JOIN bottle_stock AS b_assigned ON xref.assignedBottleId = b_assigned.id
+        WHERE xref.recipeId = :recipeId
+    """)
+    fun getDetailedIngredientsForRecipeFlow(recipeId: Long, currentTime: Long): Flow<List<RecipeIngredient>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertRecipeIngredient(crossRef: RecipeIngredientCrossRefEntity)
@@ -212,7 +240,7 @@ interface CocktailDao {
             ) as missingCount,
             (SELECT AVG(rating) FROM recipe_version_history WHERE recipeId = r.id) as averageRating
         FROM cocktail_recipe r
-        ORDER BY missingCount ASC, name ASC
+        ORDER BY r.name COLLATE NOCASE ASC
     """)
     fun getAllRecipesWithMissingCount(currentTime: Long): Flow<List<RecipeWithMissingCount>>
 

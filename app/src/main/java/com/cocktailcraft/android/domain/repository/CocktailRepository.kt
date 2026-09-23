@@ -27,8 +27,10 @@ interface CocktailRepository {
     fun getUnratedRecipes(): Flow<List<RecipeWithRating>>
     fun getAllRecipesWithMissingCount(currentTime: Long): Flow<List<RecipeWithMissingCount>>
     suspend fun getRecipeById(recipeId: Long): CocktailRecipeEntity?
+    fun getRecipeByIdFlow(recipeId: Long): Flow<CocktailRecipeEntity?>
     suspend fun deleteRecipe(recipe: CocktailRecipeEntity)
     suspend fun getIngredientsForRecipe(recipeId: Long, currentTime: Long): List<RecipeIngredient>
+    fun getIngredientsForRecipeFlow(recipeId: Long, currentTime: Long): Flow<List<RecipeIngredient>>
     suspend fun saveRecipe(recipe: CocktailRecipeEntity, ingredients: List<RecipeIngredientCrossRefEntity>)
     
     // Backup

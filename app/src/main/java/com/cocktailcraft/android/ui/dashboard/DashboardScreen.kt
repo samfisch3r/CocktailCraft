@@ -7,9 +7,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.FileUpload
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -26,7 +26,6 @@ import coil.compose.AsyncImage
 import com.cocktailcraft.android.data.local.entity.CocktailRecipeEntity
 import com.cocktailcraft.android.data.local.entity.RecipeWithRating
 import com.cocktailcraft.android.util.OnShakeListener
-import java.io.InputStream
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -37,7 +36,7 @@ fun DashboardScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
-    var showSettings by remember { mutableStateOf(value = false) }
+    var showMenu by remember { mutableStateOf(value = false) }
     var surpriseRecipe by remember { mutableStateOf<RecipeWithRating?>(null) }
 
     fun pickSurpriseRecipe() {
@@ -61,14 +60,10 @@ fun DashboardScreen(
     }
 
     val createDocumentLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("application/json"),
+        contract = ActivityResultContracts.CreateDocument("application/zip"),
     ) { uri ->
         uri?.let {
-            viewModel.createBackup { json ->
-                context.contentResolver.openOutputStream(it)?.use { output ->
-                    output.write(json.toByteArray())
-                }
-            }
+            viewModel.exportBackup(context, it)
         }
     }
 
@@ -76,11 +71,8 @@ fun DashboardScreen(
         contract = ActivityResultContracts.OpenDocument(),
     ) { uri ->
         uri?.let {
-            val inputStream: InputStream? = context.contentResolver.openInputStream(it)
-            inputStream?.bufferedReader()?.use { reader ->
-                viewModel.restoreBackup(reader.readText()) {
-                    // Refresh or notify
-                }
+            viewModel.restoreBackup(context, it) {
+                // Refresh or notify
             }
         }
     }
@@ -103,8 +95,33 @@ fun DashboardScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { showSettings = true }) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                    Box {
+                        IconButton(onClick = { showMenu = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "More options")
+                        }
+                        DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Export Bar Backup") },
+                                leadingIcon = { Icon(Icons.Default.FileDownload, contentDescription = null) },
+                                onClick = {
+                                    showMenu = false
+                                    createDocumentLauncher.launch("cocktail_backup.zip")
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Restore from Backup") },
+                                leadingIcon = { Icon(Icons.Default.FileUpload, contentDescription = null) },
+                                onClick = {
+                                    showMenu = false
+                                    openDocumentLauncher.launch(
+                                        arrayOf("application/zip", "application/json", "application/octet-stream", "*/*")
+                                    )
+                                }
+                            )
+                        }
                     }
                 }
             )
@@ -195,19 +212,6 @@ fun DashboardScreen(
                     }
                 }
             }
-        }
-    }
-
-    if (showSettings) {
-        SettingsDialog(
-            onDismiss = { showSettings = false },
-            onExport = { 
-                showSettings = false
-                createDocumentLauncher.launch("cocktail_backup.json")
-            },
-        ) {
-            showSettings = false
-            openDocumentLauncher.launch(arrayOf("application/json"))
         }
     }
 
@@ -315,38 +319,6 @@ fun SurpriseRecipeDialog(
                     Text("🍸 Let's Make It!")
                 }
             }
-        }
-    )
-}
-
-@Composable
-fun SettingsDialog(
-    onDismiss: () -> Unit,
-    onExport: () -> Unit,
-    onImport: () -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Settings & Maintenance") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text("Export your data to a file for backup, or restore from a previously saved file.", style = MaterialTheme.typography.bodyMedium)
-                
-                Button(onClick = onExport, modifier = Modifier.fillMaxWidth()) {
-                    Icon(Icons.Default.Add, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Export Bar Backup")
-                }
-                
-                OutlinedButton(onClick = onImport, modifier = Modifier.fillMaxWidth()) {
-                    Icon(Icons.Default.Clear, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Restore from Backup")
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Done") }
         }
     )
 }

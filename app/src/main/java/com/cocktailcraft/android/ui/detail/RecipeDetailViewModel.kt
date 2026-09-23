@@ -40,25 +40,24 @@ class RecipeDetailViewModel @Inject constructor(
     }
 
     private fun loadRecipeData() {
-        viewModelScope.launch {
-            val currentTime = System.currentTimeMillis()
-            val recipe = repository.getRecipeById(recipeId)
-            val ingredients = repository.getIngredientsForRecipe(recipeId, currentTime)
-            
+        val currentTime = System.currentTimeMillis()
+
+        combine(
+            repository.getRecipeByIdFlow(recipeId),
+            repository.getIngredientsForRecipeFlow(recipeId, currentTime),
+            repository.getVersionHistory(recipeId)
+        ) { recipe, ingredients, ratings ->
+            Triple(recipe, ingredients, ratings)
+        }.onEach { (recipe, ingredients, ratings) ->
             _uiState.update { 
                 it.copy(
                     recipe = recipe,
                     ingredients = ingredients,
+                    ratings = ratings,
                     isLoading = false
                 )
             }
-        }
-        
-        repository.getVersionHistory(recipeId)
-            .onEach { ratings ->
-                _uiState.update { it.copy(ratings = ratings) }
-            }
-            .launchIn(viewModelScope)
+        }.launchIn(viewModelScope)
     }
 
     fun loadMatchingBottles(ingredientId: Long, ingredientName: String) {

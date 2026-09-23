@@ -6,6 +6,7 @@ import com.cocktailcraft.android.data.local.entity.RecipeWithMissingCount
 import com.cocktailcraft.android.domain.repository.CocktailRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
+import java.text.Collator
 import javax.inject.Inject
 
 data class RecipeLibraryUiState(
@@ -17,7 +18,7 @@ data class RecipeLibraryUiState(
 
 @HiltViewModel
 class RecipeLibraryViewModel @Inject constructor(
-    private val repository: CocktailRepository
+    repository: CocktailRepository
 ) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
@@ -28,15 +29,22 @@ class RecipeLibraryViewModel @Inject constructor(
         _searchQuery,
         _onlyReadyToMake
     ) { recipes, query, onlyReady ->
-        val filtered = recipes.filter { 
-            it.recipe.name.contains(query, ignoreCase = true) ||
-            it.recipe.glassType.contains(query, ignoreCase = true) &&
-            (!onlyReady || it.missingCount == 0)
-        }
+        val collator = Collator.getInstance()
+        val filtered = recipes
+            .filter { item ->
+                val matchesQuery = query.isBlank() ||
+                        item.recipe.name.contains(query, ignoreCase = true) ||
+                        item.recipe.glassType.contains(query, ignoreCase = true)
+                val matchesReady = !onlyReady || item.missingCount == 0
+                matchesQuery && matchesReady
+            }
+            .sortedWith { a, b -> collator.compare(a.recipe.name, b.recipe.name) }
+
         RecipeLibraryUiState(
             recipes = filtered,
             searchQuery = query,
-            onlyReadyToMake = onlyReady
+            onlyReadyToMake = onlyReady,
+            isLoading = false
         )
     }.stateIn(
         scope = viewModelScope,

@@ -1,27 +1,30 @@
 package com.cocktailcraft.android.ui.dashboard
 
+import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cocktailcraft.android.data.local.entity.RecipeWithRating
-import com.cocktailcraft.android.domain.model.BarBackup
 import com.cocktailcraft.android.domain.repository.CocktailRepository
+import com.cocktailcraft.android.util.FilePersistenceHelper
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.Json
+import kotlinx.coroutines.withContext
 import java.text.Collator
 import javax.inject.Inject
 
 data class DashboardUiState(
     val recipes: List<RecipeWithRating> = emptyList(),
     val unratedRecipes: List<RecipeWithRating> = emptyList(),
-    val isLoading: Boolean = false,
-    val backupJson: String? = null
+    val isLoading: Boolean = false
 )
 
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
-    private val repository: CocktailRepository
+    private val repository: CocktailRepository,
+    private val filePersistenceHelper: FilePersistenceHelper
 ) : ViewModel() {
 
     val uiState: StateFlow<DashboardUiState> = combine(
@@ -45,22 +48,36 @@ class DashboardViewModel @Inject constructor(
         initialValue = DashboardUiState(isLoading = true)
     )
 
-    fun createBackup(onResult: (String) -> Unit) {
-        viewModelScope.launch {
-            val backup = repository.getFullBackup()
-            val json = Json.encodeToString(backup)
-            onResult(json)
+    fun exportBackup(context: Context, uri: Uri, onComplete: () -> Unit = {}) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val backup = repository.getFullBackup()
+                context.contentResolver.openOutputStream(uri)?.use { outputStream ->
+                    filePersistenceHelper.exportBackupZip(backup, outputStream)
+                }
+                withContext(Dispatchers.Main) {
+                    onComplete()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
-    fun restoreBackup(json: String, onSuccess: () -> Unit) {
-        viewModelScope.launch {
+    fun restoreBackup(context: Context, uri: Uri, onSuccess: () -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
             try {
-                val backup = Json.decodeFromString<BarBackup>(json)
-                repository.restoreBackup(backup)
-                onSuccess()
-            } catch (_: Exception) {
-                // Handle error
+                val backup = context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                    filePersistenceHelper.importBackupZip(inputStream)
+                }
+                if (backup != null) {
+                    repository.restoreBackup(backup)
+                    withContext(Dispatchers.Main) {
+                        onSuccess()
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
         }
     }

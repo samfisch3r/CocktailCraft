@@ -93,12 +93,20 @@ class CocktailRepositoryImpl @Inject constructor(
         return cocktailDao.getRecipeById(recipeId)
     }
 
+    override fun getRecipeByIdFlow(recipeId: Long): Flow<CocktailRecipeEntity?> {
+        return cocktailDao.getRecipeByIdFlow(recipeId)
+    }
+
     override suspend fun deleteRecipe(recipe: CocktailRecipeEntity) {
         cocktailDao.deleteRecipe(recipe)
     }
 
     override suspend fun getIngredientsForRecipe(recipeId: Long, currentTime: Long): List<RecipeIngredient> {
         return cocktailDao.getDetailedIngredientsForRecipe(recipeId, currentTime)
+    }
+
+    override fun getIngredientsForRecipeFlow(recipeId: Long, currentTime: Long): Flow<List<RecipeIngredient>> {
+        return cocktailDao.getDetailedIngredientsForRecipeFlow(recipeId, currentTime)
     }
 
     override suspend fun saveRecipe(
