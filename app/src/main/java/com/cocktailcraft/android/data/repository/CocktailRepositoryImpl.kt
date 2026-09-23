@@ -113,7 +113,12 @@ class CocktailRepositoryImpl @Inject constructor(
         recipe: CocktailRecipeEntity,
         ingredients: List<RecipeIngredientCrossRefEntity>
     ) {
-        val recipeId = cocktailDao.insertRecipe(recipe)
+        val recipeId = if (recipe.id > 0) {
+            cocktailDao.updateRecipe(recipe)
+            recipe.id
+        } else {
+            cocktailDao.insertRecipe(recipe)
+        }
         // Clear old ingredients if editing
         cocktailDao.deleteIngredientsForRecipe(recipeId)
         ingredients.forEach { 

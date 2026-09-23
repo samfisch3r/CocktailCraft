@@ -86,6 +86,9 @@ interface CocktailDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertRecipe(recipe: CocktailRecipeEntity): Long
 
+    @Update
+    suspend fun updateRecipe(recipe: CocktailRecipeEntity)
+
     @Query("SELECT * FROM cocktail_recipe WHERE id = :recipeId")
     suspend fun getRecipeById(recipeId: Long): CocktailRecipeEntity?
 
