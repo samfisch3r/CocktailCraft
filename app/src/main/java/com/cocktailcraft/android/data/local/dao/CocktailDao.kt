@@ -305,6 +305,12 @@ interface CocktailDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertVersionHistory(version: RecipeVersionHistoryEntity)
 
+    @Update
+    suspend fun updateVersionHistory(version: RecipeVersionHistoryEntity)
+
+    @Delete
+    suspend fun deleteVersionHistory(version: RecipeVersionHistoryEntity)
+
     @Query("SELECT * FROM recipe_version_history WHERE recipeId = :recipeId ORDER BY versionNumber DESC")
     fun getVersionHistory(recipeId: Long): Flow<List<RecipeVersionHistoryEntity>>
 }

@@ -195,7 +195,13 @@ fun RecipeDetailScreen(
             rating = rating,
             ingredients = uiState.selectedRatingIngredients,
             onDismiss = { viewModel.selectRating(null) },
-            onRestore = { viewModel.restoreRating(rating) }
+            onRestore = { viewModel.restoreRating(rating) },
+            onUpdate = { newRating, newNotes ->
+                viewModel.updateRating(rating, newRating, newNotes)
+            },
+            onDelete = {
+                viewModel.deleteRating(rating)
+            }
         )
     }
 
@@ -378,21 +384,117 @@ fun RatingCard(
 }
 
 @Composable
+fun StarRatingPicker(
+    rating: Float,
+    onRatingChange: (Float) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        (1..5).forEach { starIndex ->
+            val isSelected = starIndex <= rating.toInt()
+            IconButton(onClick = { onRatingChange(starIndex.toFloat()) }) {
+                Icon(
+                    imageVector = Icons.Default.Star,
+                    contentDescription = "$starIndex stars",
+                    tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
 fun RatingSnapshotDialog(
     rating: RecipeVersionHistoryEntity,
     ingredients: List<IngredientSnapshot>,
     onDismiss: () -> Unit,
     onRestore: () -> Unit,
+    onUpdate: (Float, String?) -> Unit,
+    onDelete: () -> Unit,
 ) {
+    var editableRating by remember(rating) { mutableFloatStateOf(rating.rating) }
+    var editableNotes by remember(rating) { mutableStateOf(rating.tweakNotes ?: "") }
+    var isEditing by remember { mutableStateOf(false) }
+
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Rating #${rating.versionNumber} Details") },
+        title = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Rating #${rating.versionNumber}")
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { isEditing = !isEditing }) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Edit Rating",
+                            tint = if (isEditing) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    IconButton(onClick = onDelete) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Delete Rating",
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            }
+        },
         text = {
             Column(
-                modifier = Modifier.fillMaxWidth().heightIn(max = 500.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 450.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text(text = "Ingredients", style = MaterialTheme.typography.titleSmall)
+                if (isEditing) {
+                    Text("Change Rating Score:", style = MaterialTheme.typography.titleSmall)
+                    StarRatingPicker(
+                        rating = editableRating,
+                        onRatingChange = { editableRating = it }
+                    )
+                    OutlinedTextField(
+                        value = editableNotes,
+                        onValueChange = { editableNotes = it },
+                        label = { Text("Tweak Notes") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        (1..5).forEach { starIndex ->
+                            Icon(
+                                imageVector = Icons.Default.Star,
+                                contentDescription = null,
+                                tint = if (starIndex <= rating.rating.toInt()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = "${rating.rating.toInt()} Stars",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    if (!rating.tweakNotes.isNullOrBlank()) {
+                        Text(
+                            text = "Notes: ${rating.tweakNotes}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+
+                HorizontalDivider()
+                Text(text = "Ingredients Spec", style = MaterialTheme.typography.titleSmall)
                 ingredients.forEach { 
                     val name = it.preferredBrand ?: it.assignedBottleName ?: it.ingredientName
                     val text = if (it.unit == IngredientUnit.TOP_UP) {
@@ -403,18 +505,25 @@ fun RatingSnapshotDialog(
                     Text(text = text, style = MaterialTheme.typography.bodySmall)
                 }
                 HorizontalDivider()
-                Text(text = "Instructions", style = MaterialTheme.typography.titleSmall)
+                Text(text = "Instructions Spec", style = MaterialTheme.typography.titleSmall)
                 Text(text = rating.instructions, style = MaterialTheme.typography.bodySmall)
-                if (!rating.tweakNotes.isNullOrBlank()) {
-                    HorizontalDivider()
-                    Text(text = "Notes", style = MaterialTheme.typography.titleSmall)
-                    Text(text = rating.tweakNotes, style = MaterialTheme.typography.bodySmall)
-                }
             }
         },
         confirmButton = {
-            Button(onClick = onRestore) {
-                Text("Restore this spec")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (isEditing) {
+                    Button(
+                        onClick = {
+                            onUpdate(editableRating, editableNotes.ifBlank { null })
+                        }
+                    ) {
+                        Text("Save Rating")
+                    }
+                } else {
+                    Button(onClick = onRestore) {
+                        Text("Restore Spec")
+                    }
+                }
             }
         },
         dismissButton = {
@@ -437,24 +546,22 @@ fun AddRatingDialog(
         onDismissRequest = onDismiss,
         title = { Text("Add Rating") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Rating: ${rating.toInt()} Stars")
-                Slider(
-                    value = rating,
-                    onValueChange = { rating = it },
-                    valueRange = 1f..5f,
-                    steps = 3
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Select Rating:", style = MaterialTheme.typography.titleSmall)
+                StarRatingPicker(
+                    rating = rating,
+                    onRatingChange = { rating = it }
                 )
                 OutlinedTextField(
                     value = notes,
                     onValueChange = { notes = it },
-                    label = { Text("Notes") },
+                    label = { Text("Tweak / Rating Notes") },
                     modifier = Modifier.fillMaxWidth()
                 )
             }
         },
         confirmButton = {
-            TextButton(onClick = { onSave(rating, notes) }) {
+            Button(onClick = { onSave(rating, notes) }) {
                 Text("Save")
             }
         },

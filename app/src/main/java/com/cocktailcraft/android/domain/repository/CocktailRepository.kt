@@ -40,6 +40,8 @@ interface CocktailRepository {
     // History
     fun getVersionHistory(recipeId: Long): Flow<List<RecipeVersionHistoryEntity>>
     suspend fun addVersion(version: RecipeVersionHistoryEntity)
+    suspend fun updateVersion(version: RecipeVersionHistoryEntity)
+    suspend fun deleteVersion(version: RecipeVersionHistoryEntity)
 }
 
 interface NetworkRecipeRepository {

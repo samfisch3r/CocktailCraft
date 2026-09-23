@@ -134,6 +134,14 @@ class CocktailRepositoryImpl @Inject constructor(
         cocktailDao.insertVersionHistory(version)
     }
 
+    override suspend fun updateVersion(version: RecipeVersionHistoryEntity) {
+        cocktailDao.updateVersionHistory(version)
+    }
+
+    override suspend fun deleteVersion(version: RecipeVersionHistoryEntity) {
+        cocktailDao.deleteVersionHistory(version)
+    }
+
     override suspend fun getFullBackup(): com.cocktailcraft.android.domain.model.BarBackup {
         return com.cocktailcraft.android.domain.model.BarBackup(
             ingredients = cocktailDao.getAllIngredientsSync(),

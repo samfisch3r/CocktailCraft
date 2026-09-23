@@ -112,6 +112,24 @@ class RecipeDetailViewModel @Inject constructor(
         }
     }
 
+    fun updateRating(version: RecipeVersionHistoryEntity, newRating: Float, newNotes: String?) {
+        viewModelScope.launch {
+            val updated = version.copy(
+                rating = newRating,
+                tweakNotes = newNotes
+            )
+            repository.updateVersion(updated)
+            selectRating(null)
+        }
+    }
+
+    fun deleteRating(version: RecipeVersionHistoryEntity) {
+        viewModelScope.launch {
+            repository.deleteVersion(version)
+            selectRating(null)
+        }
+    }
+
     fun selectRating(rating: RecipeVersionHistoryEntity?) {
         val ingredients = if (rating != null) {
             try {
